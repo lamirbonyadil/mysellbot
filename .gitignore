@@ -1,0 +1,28 @@
+# Dependencies
+/vendor/
+
+# Local backups created during manual edits
+*.bak
+*.bak[0-9]*
+
+# Logs
+error_log
+*.log
+
+# Cron lock files
+cron/*.lock
+cron/.*.lock
+
+*.md
+
+# Environment / local config overrides (.env.example is intentionally NOT
+# ignored - it documents the expected keys with placeholder values)
+.env
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+composer.lock
