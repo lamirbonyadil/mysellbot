@@ -783,6 +783,7 @@ function DirectPayment($order_id)
             // Mark the invoice as active again
             update("invoice", "Status", "active", "id_invoice", $nameloc['id_invoice']);
             update("invoice", "Volume_Warning_Level", "0", "id_invoice", $nameloc['id_invoice']);
+            update("invoice", "Day_Warning_Level", "0", "id_invoice", $nameloc['id_invoice']);
             // Notify the user that the renewal completed automatically
             $priceproductformat = number_format($product['price_product']);
             $balanceformatsell  = number_format(select("user", "Balance", "id", $Payment_report['id_user'], "select")['Balance']);
