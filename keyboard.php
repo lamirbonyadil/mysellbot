@@ -171,7 +171,7 @@ $step_payment = json_encode($step_payment);
 // flow (step `getprice`). See index.php's text_Add_Balance handler.
 $walletTopupAmounts = [100000, 150000, 200000, 250000, 300000, 400000, 500000, 700000, 1000000];
 $walletAmountRows = [];
-foreach (array_chunk($walletTopupAmounts, 3) as $amountRow) {
+foreach (array_chunk($walletTopupAmounts, 2) as $amountRow) {
     $row = [];
     foreach ($amountRow as $amount) {
         $row[] = [
