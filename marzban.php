@@ -269,7 +269,6 @@ function Modifyuser($location, $username, array $data)
     $headers[] = "Accept: application/json";
     $headers[] = "Authorization: Bearer " . $Check_token["access_token"];
     $headers[] = "Content-Type: application/json";
-    $headers[] = "x-bot-secret" . ": " . $SECRET;
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
     $result = curl_exec($ch);
