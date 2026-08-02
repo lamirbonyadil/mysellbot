@@ -618,3 +618,98 @@ function ensure_default_groups($location)
         return false;
     }
 }
+
+/**
+ * How many usernames to request per Marzban bulk-fetch HTTP call (see
+ * bulkFetchMarzbanUsers() below). Deliberately independent of how many
+ * total users live on the panel - we only ever ask for usernames the
+ * caller actually needs, chunked to keep each request's query string and
+ * response payload small and predictable. This is what keeps a panel with
+ * thousands of users from ever being fetched "all at once".
+ */
+const MARZBAN_BULK_CHUNK_SIZE = 150;
+
+/**
+ * Bulk fetch for Marzban panels.
+ *
+ * Marzban's GET /api/users accepts a repeatable `username` query parameter
+ * that returns only the requested usernames in one response. That lets a
+ * caller fetch exactly the usernames it needs instead of:
+ *   - fetching the panel's ENTIRE user list (a busy panel can have
+ *     thousands of users - large payload, slow response, mostly wasted), or
+ *   - one HTTP call per username.
+ *
+ * Requests are chunked by MARZBAN_BULK_CHUNK_SIZE so the amount of work per
+ * call tracks the number of usernames asked for, not panel size.
+ *
+ * Marzban-only: the `username` array filter is confirmed for Marzban's API
+ * but not for other panel types, which keep using the per-user
+ * ManagePanel::DataUser() path.
+ *
+ * @param array $panel     Row from `marzban_panel` (needs id + url_panel).
+ * @param array $usernames Usernames to fetch (already de-duplicated).
+ * @return array<string, array{status:string, expire:?int, data_limit:?int, used_traffic:?int}>
+ *         Keyed by username; missing/unresolved usernames simply won't have
+ *         a key, which callers treat the same as "not found".
+ */
+function bulkFetchMarzbanUsers(array $panel, array $usernames): array
+{
+    $result = [];
+    if (empty($usernames)) {
+        return $result;
+    }
+
+    $token = token_panel($panel['id']);
+    if (!isset($token['access_token'])) {
+        // Auth failure - leave all usernames unresolved rather than falling
+        // back to per-user calls that would hit the same auth problem N times.
+        return $result;
+    }
+
+    foreach (array_chunk($usernames, MARZBAN_BULK_CHUNK_SIZE) as $chunk) {
+        $queryParts = ['limit=' . count($chunk)];
+        foreach ($chunk as $username) {
+            $queryParts[] = 'username=' . rawurlencode($username);
+        }
+        $url = rtrim($panel['url_panel'], '/') . '/api/users?' . implode('&', $queryParts);
+
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_HTTPGET => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT_MS => 8000,
+            CURLOPT_HTTPHEADER => [
+                'Accept: application/json',
+                'Authorization: Bearer ' . $token['access_token'],
+            ],
+        ]);
+        $output = curl_exec($ch);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError || !$output) {
+            // Network hiccup for this chunk only; those usernames stay unresolved.
+            continue;
+        }
+
+        $body = json_decode($output, true);
+        if (!isset($body['users']) || !is_array($body['users'])) {
+            continue;
+        }
+
+        foreach ($body['users'] as $u) {
+            if (!isset($u['username'])) {
+                continue;
+            }
+            $result[$u['username']] = [
+                'status'       => $u['status'] ?? '',
+                'expire'       => $u['expire'] ?? null,
+                'data_limit'   => $u['data_limit'] ?? null,
+                'used_traffic' => $u['used_traffic'] ?? null,
+            ];
+        }
+    }
+
+    return $result;
+}
