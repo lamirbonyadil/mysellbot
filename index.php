@@ -186,12 +186,6 @@ if (strpos($text, "/start ") !== false) {
         return;
     }
     $token = str_replace("/start ", "", $text);
-    if ($token === "start") {
-        $text_start = "👋 سلام <b>{$first_name}</b> عزیز خوش آمدید🌷 \n\nبرای استفاده از ربات از منو زیر یک گزینه را انتخاب کنید👇 ";
-        sendmessage($from_id, $text_start, $keyboard, 'html');
-        step('home', $from_id);
-        return;
-    }
     if ($token === "services") {
         // Redirect straight to My Services page
         $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn') ORDER BY time_sell DESC LIMIT 10");
@@ -213,7 +207,42 @@ if (strpos($text, "/start ") !== false) {
             ['text' => $textbotlang['users']['page']['previous'], 'callback_data' => 'previous_page'],
         ];
         sendmessage($from_id, $textbotlang['users']['sell']['service_sell'], json_encode($keyboardlists), 'html');
-        step('home', $from_id);
+        return;
+    }
+    if ($token === "buy") {
+        $locationproduct = select("marzban_panel", "*", "status", "activepanel", "count");
+        if ($locationproduct == 0) {
+            sendmessage($from_id, $textbotlang['Admin']['managepanel']['nullpanel'], null, 'HTML');
+            return;
+        }
+        if ($setting['get_number'] == "1" && $user['step'] != "get_number" && $user['number'] == "none") {
+            sendmessage($from_id, $textbotlang['users']['number']['Confirming'], $request_contact, 'HTML');
+            step('get_number', $from_id);
+        }
+        if ($user['number'] == "none" && $setting['get_number'] == "1")
+            return;
+        if ($locationproduct == 1) {
+            $panel = select("marzban_panel", "*", "status", "activepanel", "select");
+            update("user", "Processing_value", $panel['name_panel'], "id", $from_id, "select");
+            if ($setting['statuscategory'] == "0") {
+                $nullproduct = select("product", "*", null, null, "count");
+                if ($nullproduct == 0) {
+                    sendmessage($from_id, $textbotlang['Admin']['Product']['nullpProduct'], null, 'HTML');
+                    return;
+                }
+                $textproduct = sprintf($textbotlang['users']['buy']['selectService'], $panel['name_panel']);
+                sendmessage($from_id, $textproduct, KeyboardProduct($panel['name_panel'], "backuser", $panel['MethodUsername']), 'HTML');
+            } else {
+                $emptycategory = select("category", "*", null, null, "count");
+                if ($emptycategory == 0) {
+                    sendmessage($from_id, $textbotlang['users']['category']['NotFound'], null, 'HTML');
+                    return;
+                }
+                sendmessage($from_id, $textbotlang['users']['category']['selectCategory'], KeyboardCategorybuy("backuser", $panel['name_panel']), 'HTML');
+            }
+        } else {
+            sendmessage($from_id, $textbotlang['users']['Service']['Location'], $list_marzban_panel_user, 'HTML');
+        }
         return;
     }
     $refRow = select("user", "id", "ref_code", $token, "select");
