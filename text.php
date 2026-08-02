@@ -714,6 +714,22 @@ $textbotlang['Admin']['channel']['setchannel'] = "🔰 کانال با موفق�
 $textbotlang['Admin']['channel']['setting'] = "📯 تنظیمات کانال";
 $textbotlang['Admin']['channel']['changechannelbtn'] = "📣 تنظیم کانال جوین اجباری";
 $textbotlang['Admin']['channel']['channelreport'] = "📣 تنظیم کانال گزارش";
+$textbotlang['Admin']['backup']['menubtn'] = "💾 بکاپ گیری";
+$textbotlang['Admin']['backup']['setchannelbtn'] = "🗂 تنظیم کانال بکاپ";
+$textbotlang['Admin']['backup']['runbtn'] = "📦 ارسال بکاپ الان";
+$textbotlang['Admin']['backup']['getchannel'] = "🗂 آیدی عددی یا یوزرنیم کانال بکاپ را ارسال کنید.
+ربات باید در کانال ادمین باشد.
+
+کانال فعلی : ";
+$textbotlang['Admin']['backup']['setchannel'] = "✅ کانال بکاپ ذخیره شد.";
+$textbotlang['Admin']['backup']['started'] = "⏳ در حال تهیه بکاپ از دیتابیس و سورس ربات ... این کار ممکن است چند دقیقه طول بکشد.";
+$textbotlang['Admin']['backup']['success'] = "✅ بکاپ با موفقیت به کانال بکاپ ارسال شد.
+📁 %s";
+$textbotlang['Admin']['backup']['nochannel'] = "❌ کانال بکاپ تنظیم نشده است. ابتدا کانال بکاپ را تنظیم کنید.";
+$textbotlang['Admin']['backup']['toolarge'] = "❌ حجم فایل بکاپ (%s مگابایت) از محدودیت ۵۰ مگابایتی تلگرام بیشتر است.";
+$textbotlang['Admin']['backup']['failed'] = "❌ تهیه یا ارسال بکاپ با خطا مواجه شد. لاگ خطا را بررسی کنید.";
+$textbotlang['Admin']['backup']['croninfo'] = "🕚 برای بکاپ روزانه خودکار این دستور را در کرون جاب سرور ثبت کنید :
+<code>%s</code>";
 
 
 $textbotlang['Admin']['Statistics']['info'] = "

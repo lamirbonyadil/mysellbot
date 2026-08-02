@@ -116,6 +116,7 @@ try {
         iran_number varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin  NULL,
         NotUser varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin  NULL,
         Channel_Report varchar(600)  NULL,
+        Channel_Backup varchar(600)  NULL,
         limit_usertest_all varchar(600)  NULL,
         time_usertest varchar(600)  NULL,
         val_usertest varchar(600)  NULL,
@@ -142,6 +143,7 @@ $connect->query("INSERT INTO setting (Bot_Status,roll_Status,get_number,limit_us
         addFieldToTable($tableName, 'namecustome', '0',"VARCHAR(200)");
         addFieldToTable($tableName, 'removedayc', '1',"VARCHAR(100)");
         addFieldToTable($tableName, 'Extra_volume', '0',"VARCHAR(200)");
+        addFieldToTable($tableName, 'Channel_Backup', '',"VARCHAR(600)");
         $settingsql = mysqli_fetch_assoc(mysqli_query($connect, "SELECT * FROM setting"));
         $active_phone_iran_text = "0";
         if(!isset($settingsql['iran_number'])){

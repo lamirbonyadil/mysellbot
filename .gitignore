@@ -13,6 +13,9 @@ error_log
 cron/*.lock
 cron/.*.lock
 
+# Backup archives / dumps produced by backup.php
+/backups/
+
 *.md
 
 # Environment / local config overrides (.env.example is intentionally NOT

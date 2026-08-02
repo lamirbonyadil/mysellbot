@@ -680,6 +680,37 @@ if ($text == $textbotlang['Admin']['channel']['channelreport']) {
     sendmessage($setting['Channel_Report'], $textbotlang['Admin']['Channel']['TestChannel'], null, 'HTML');
 }
 #-------------------------#
+if ($text == $textbotlang['Admin']['backup']['menubtn']) {
+    $cronCommandbackup = "30 4 * * * curl -s https://$domainhosts/cron/cronbackup.php > /dev/null 2>&1";
+    sendmessage($from_id, sprintf($textbotlang['Admin']['backup']['croninfo'], $cronCommandbackup), $backup_panel, 'HTML');
+    step('home', $from_id);
+} elseif ($text == $textbotlang['Admin']['backup']['setchannelbtn']) {
+    sendmessage($from_id, $textbotlang['Admin']['backup']['getchannel'] . ($setting['Channel_Backup'] ?? ''), $backadmin, 'HTML');
+    step('addbackupchannel', $from_id);
+} elseif ($user['step'] == "addbackupchannel") {
+    update("setting", "Channel_Backup", $text);
+    step('home', $from_id);
+    sendmessage($from_id, $textbotlang['Admin']['backup']['setchannel'], $backup_panel, 'HTML');
+    sendmessage($text, $textbotlang['Admin']['Channel']['TestChannel'], null, 'HTML');
+} elseif ($text == $textbotlang['Admin']['backup']['runbtn']) {
+    require_once __DIR__ . '/backup.php';
+    // Tell the admin before dumping: on a grown database the zip step can take
+    // minutes, and a silent bot looks broken.
+    sendmessage($from_id, $textbotlang['Admin']['backup']['started'], $backup_panel, 'HTML');
+    set_time_limit(600);
+    $backupResult = runBackup();
+    if ($backupResult['ok']) {
+        sendmessage($from_id, sprintf($textbotlang['Admin']['backup']['success'], $backupResult['file']), $backup_panel, 'HTML');
+    } elseif ($backupResult['error'] == "no_channel") {
+        sendmessage($from_id, $textbotlang['Admin']['backup']['nochannel'], $backup_panel, 'HTML');
+    } elseif ($backupResult['error'] == "too_large") {
+        sendmessage($from_id, sprintf($textbotlang['Admin']['backup']['toolarge'], round($backupResult['bytes'] / 1048576, 2)), $backup_panel, 'HTML');
+    } else {
+        sendmessage($from_id, $textbotlang['Admin']['backup']['failed'], $backup_panel, 'HTML');
+    }
+    step('home', $from_id);
+}
+#-------------------------#
 if ($text == $textbotlang['Admin']['keyboardadmin']['shop_section']) {
     sendmessage($from_id, $textbotlang['users']['selectoption'], $shopkeyboard, 'HTML');
 } elseif ($text == $textbotlang['Admin']['Product']['addproduct']) {

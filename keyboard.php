@@ -128,6 +128,15 @@ $setting_panel = json_encode([
         [['text' => $textbotlang['Admin']['keyboardadmin']['settingscron']], ['text' => $textbotlang['Admin']['keyboardadmin']['test_account_settings']]],
         [['text' => $textbotlang['Admin']['channel']['channelreport']], ['text' => $textbotlang['Admin']['channel']['setting']]],
         [['text' => $textbotlang['Admin']['keyboardadmin']['affiliate_settings']]],
+        [['text' => $textbotlang['Admin']['backup']['menubtn']]],
+        [['text' => $textbotlang['Admin']['Back-Adminment']]]
+    ],
+    'resize_keyboard' => true
+]);
+$backup_panel = json_encode([
+    'keyboard' => [
+        [['text' => $textbotlang['Admin']['backup']['runbtn']]],
+        [['text' => $textbotlang['Admin']['backup']['setchannelbtn']]],
         [['text' => $textbotlang['Admin']['Back-Adminment']]]
     ],
     'resize_keyboard' => true
