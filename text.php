@@ -142,15 +142,34 @@ $textbotlang['users']['extend']['thanks'] = "با تشکر از تمدید سر�
 $textbotlang['users']['extend']['error'] = "❌ خطایی رخ داده است برای رفع مشکل با پشتیبانی در ارتباط باشید";
 $textbotlang['users']['extend']['error2'] = "❌ خطایی در تمدید سرویس رخ داده است. مراحل تمدید را از اول انجام دهید.";
 $textbotlang['users']['extend']['selectservice'] = " 🛍 محصول خود را برای تمدید انتخاب نمایید";
+$textbotlang['users']['extend']['selectservicecampaign'] = "🎉 <b>تمدید با تخفیف فعال است!</b>
+
+✅ روی تمام محصولات %s%% تخفیف تمدید اعمال می‌شود.
+⏳ پایان تخفیف : %s
+
+❕ قیمت‌های روی دکمه‌ها بدون تخفیف است؛ مبلغ نهایی با تخفیف در فاکتور نمایش داده می‌شود. 
+
+ 🛍 محصول خود را برای تمدید انتخاب نمایید";
 $textbotlang['users']['extend']['invoicExtend'] = "🧾 فاکتور تمدید شما برای نام کاربری %s ایجاد شد.
             
-🛍 نام محصول :  %s
-مبلغ تمدید :  %s
-مدت زمان تمدید : %s روز
-حجم تمدید : %s گیگ
+🛍 نام محصول:  %s
+مبلغ تمدید:  %s تومان
+مدت زمان تمدید: %s روز
+حجم تمدید: %s گیگ
             
 ✅ برای تایید و تمدید سرویس روی دکمه زیر کلیک کنید
             
+❌ برای تمدید باید کیف پول خود را شارژ کنید.";
+$textbotlang['users']['extend']['campaign'] = "🧾 فاکتور تمدید شما برای نام کاربری %s ایجاد شد.
+
+🛍 نام محصول :  %s
+💰 قیمت اصلی : <s>%s</s> تومان
+✅ مبلغ قابل پرداخت (با تخفیف %s%%) : <b>%s</b> تومان
+مدت زمان تمدید : %s روز
+حجم تمدید : %s گیگ
+
+✅ برای تایید و تمدید سرویس روی دکمه زیر کلیک کنید
+
 ❌ برای تمدید باید کیف پول خود را شارژ کنید.";
 
 
@@ -361,19 +380,19 @@ $textbotlang['users']['status']['descriptions_removeservice'] = " با کلیک 
 $textbotlang['users']['status']['exitsrequsts'] = "❌ شما یک درخواست ثبت شده دارید منتظر بررسی درخواست ثبت شده باشید بعد از بررسی می توانید درخواست حذف خود را ثبت کنید";
 $textbotlang['users']['status']['sendrequestsremove'] ="📌 با کلیک بر روی دکمه \"✅ درخواست حذف سرویس را دارم\"، درخواست حذف سرویس شما به مدیریت ارسال خواهد شد و پس از بررسی، سرویس شما کنسل خواهد شد.\n\n❌ در صورت تأیید مدیریت، مبلغ مصرفی باقی‌مانده به کیف پول شما واریز خواهد شد.\n\nمتشکریم که از خدمات ما استفاده می‌کنید.";
 $textbotlang['users']['status']['RemoveSerivecbtn'] = "🗑 حذف سرویس";
-$textbotlang['users']['status']['InfoSerivceDisable'] = "وضعیت سرویس : %s
-نام کاربری سرویس : <code>%s</code>
-لوکیشن :%s
-کد سرویس:%s
+$textbotlang['users']['status']['InfoSerivceDisable'] = "وضعیت سرویس: %s
+نام کاربری سرویس: <code>%s</code>
+لوکیشن : %s
+کد سرویس: %s
     
 ♾ حجم سرویس : %s
 📥 حجم مصرفی : %s
 
 📅 فعال تا تاریخ : %s (%s)";
-$textbotlang['users']['status']['InfoSerivceActive'] = "وضعیت سرویس : %s
-نام کاربری سرویس : <code>%s</code>
-لوکیشن :%s
-کد سرویس:%s
+$textbotlang['users']['status']['InfoSerivceActive'] = "وضعیت سرویس: %s
+نام کاربری سرویس: <code>%s</code>
+لوکیشن: %s
+کد سرویس: %s
     
 🟢 اخرین زمان اتصال شما : %s
     
@@ -1004,6 +1023,7 @@ $textbotlang['Admin']['systemsms']['acceptsend'] = "در صورت تایید م�
 $textbotlang['Admin']['systemsms']['cancelsend'] = "لغو ارسال";
 $textbotlang['Admin']['systemsms']['sendingmessage'] = "📌 پیام شما  در صف ارسال قرار گرفت پس از ارسال پیام تایید برای شما ارسال می شود ( ارسال پیام ممکن است  حداکثر 8 ساعت زمان ببرد بدلیل محدودیت های تلگرام )";
 $textbotlang['Admin']['systemsms']['canceledmessage'] = "📌 ارسال پیام لغو گردید.";
+$textbotlang['Admin']['systemsms']['busysending'] = "⚠️ یک ارسال همگانی دیگر هنوز در حال انجام است. لطفا تا پایان آن صبر کنید یا ارسال قبلی را لغو نمایید.";
 $textbotlang['Admin']['systemsms']['sendingforward'] = "درحال ارسال پیام";
 $textbotlang['Admin']['systemsms']['sendforwardtousers'] = "✅ پیام به تمامی کاربران ارسال شد";
 $textbotlang['Admin']['systemsms']['sendmessageauser'] = "✍️ ارسال پیام برای یک کاربر";
@@ -1221,6 +1241,47 @@ $textbotlang['Admin']['Discount']['typediscount'] = "📌 کد تخفیف برا
 
 
 $textbotlang['Admin']['mesage']['nottextmessage'] ="❌  در ارسال همگانی فقط متن می توانید ارسال نمایید.";
+
+$textbotlang['Admin']['RenewalCampaign']['create'] = "🎉 تمدید با تخفیف";
+$textbotlang['Admin']['RenewalCampaign']['list'] = "📋 تمدید با تخفیف های فعال";
+$textbotlang['Admin']['RenewalCampaign']['getpanel'] = "🌍 پنلی که می خواهید تمدید با تخفیف روی آن فعال شود را انتخاب کنید";
+$textbotlang['Admin']['RenewalCampaign']['invalidpanel'] = "❌ چنین پنلی وجود ندارد. دوباره از لیست انتخاب کنید.";
+$textbotlang['Admin']['RenewalCampaign']['alreadyactive'] = "⚠️ روی پنل %s همین حالا تمدید با تخفیف %s%% فعال است (%s ساعت باقی مانده).
+
+برای ثبت مورد جدید ابتدا مورد فعال را از بخش «تمدید با تخفیف های فعال» متوقف کنید، یا پنل دیگری انتخاب کنید.";
+$textbotlang['Admin']['RenewalCampaign']['getpercent'] = "🔢 درصد تخفیف تمدید را ارسال کنید (عددی بین ۱ تا ۹۹)";
+$textbotlang['Admin']['RenewalCampaign']['invalidpercent'] = "❌ درصد نامعتبر است. یک عدد بین ۱ تا ۹۹ ارسال کنید.";
+$textbotlang['Admin']['RenewalCampaign']['gethours'] = "⏳ مدت زمان تمدید با تخفیف را بر حسب ساعت ارسال کنید (عددی بین ۱ تا ۸۷۶۰)";
+$textbotlang['Admin']['RenewalCampaign']['invalidhours'] = "❌ مدت زمان نامعتبر است. یک عدد بین ۱ تا ۸۷۶۰ ساعت ارسال کنید.";
+$textbotlang['Admin']['RenewalCampaign']['saved'] = "✅ تمدید با تخفیف ثبت شد
+
+🌍 پنل : %s
+🎯 درصد تخفیف : %s%%
+⏳ مدت اعتبار : %s ساعت";
+$textbotlang['Admin']['RenewalCampaign']['empty'] = "❕ در حال حاضر هیچ تمدید با تخفیف فعالی وجود ندارد.";
+$textbotlang['Admin']['RenewalCampaign']['listtitle'] = "📋 تمدید با تخفیف های فعال :";
+$textbotlang['Admin']['RenewalCampaign']['listrow'] = "🌍 پنل : %s
+🎯 درصد تخفیف : %s%%
+⏳ زمان باقی مانده : %s ساعت";
+$textbotlang['Admin']['RenewalCampaign']['stopbtn'] = "❌ توقف تخفیف %s";
+$textbotlang['Admin']['RenewalCampaign']['stopped'] = "✅ تمدید با تخفیف پنل %s متوقف شد.";
+$textbotlang['Admin']['RenewalCampaign']['notactive'] = "❌ تمدید با تخفیف فعالی برای این پنل وجود ندارد.";
+$textbotlang['Admin']['RenewalCampaign']['notifyqueued'] = "📣 اطلاع رسانی به کاربران در حال ارسال است.";
+$textbotlang['Admin']['RenewalCampaign']['notifybusy'] = "⚠️ یک ارسال همگانی دیگر در حال انجام است، پس اطلاع رسانی این تخفیف ارسال نشد. بعد از پایان آن ارسال، از بخش «ارسال پیام همگانی» به کاربران خبر دهید.";
+$textbotlang['Admin']['RenewalCampaign']['notifyusers'] = "🎉 <b>تمدید با تخفیف فعال شد!</b>
+
+🌍 پنل : %s
+🎯 درصد تخفیف : %s%%
+⏳ پایان تخفیف : %s
+
+💊 از بخش «سرویس های من» سرویس خود را با تخفیف تمدید کنید.";
+$textbotlang['Admin']['RenewalCampaign']['notifyend'] = "⏳ <b>تمدید با تخفیف پایان یافت</b>
+
+🌍 پنل : %s
+🎯 درصد تخفیف : %s%%
+
+از این پس تمدید سرویس های این سرور با قیمت عادی انجام می شود.";
+
 
 
 $textbotlang['Admin']['keyboardadmin']['bot_statistics'] = "📊 آمار ربات";

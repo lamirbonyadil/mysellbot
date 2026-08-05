@@ -1305,7 +1305,15 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
     ];
 
     $json_list_product_lists = json_encode($productextend);
-    Editmessagetext($from_id, $message_id, $textbotlang['users']['extend']['selectservice'], $json_list_product_lists);
+    $extendCampaign = getActiveRenewalCampaign($nameloc['Service_location']);
+    $textselectservice = $extendCampaign === null
+        ? $textbotlang['users']['extend']['selectservice']
+        : sprintf(
+            $textbotlang['users']['extend']['selectservicecampaign'],
+            $extendCampaign['percent'],
+            jdate('Y/m/d - H:i', intval($extendCampaign['expires_at']))
+        );
+    Editmessagetext($from_id, $message_id, $textselectservice, $json_list_product_lists);
 } elseif (preg_match('/serviceextendselect_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
     $codeproduct = $dataget[1];
     $nameloc = select("invoice", "*", "username", $user['Processing_value'], "select");
@@ -1364,7 +1372,8 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
     update("invoice", "name_product", $product['name_product'], "username", $user['Processing_value']);
     update("invoice", "Service_time", $product['Service_time'], "username", $user['Processing_value']);
     update("invoice", "Volume", $product['Volume_constraint'], "username", $user['Processing_value']);
-    update("invoice", "price_product", $product['price_product'], "username", $user['Processing_value']);
+    $campaignPrice = applyRenewalCampaignPrice($product['price_product'], $nameloc['Service_location']);
+    update("invoice", "price_product", $campaignPrice['price'], "username", $user['Processing_value']);
     update("user", "Processing_value_one", $codeproduct, "id", $from_id);
     $keyboardextend = json_encode([
         'inline_keyboard' => [
@@ -1377,7 +1386,7 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
             ]
         ]
     ]);
-    $textextend = sprintf($textbotlang['users']['extend']['invoicExtend'], $nameloc['username'], $product['name_product'], $product['price_product'], $product['Service_time'], $product['Volume_constraint']);
+    $textextend = renderRenewalExtendInvoice($campaignPrice, $product, $nameloc, $textbotlang);
     Editmessagetext($from_id, $message_id, $textextend, $keyboardextend);
 } elseif (preg_match('/confirmextendwarning_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
     // User acknowledged the remaining-volume warning; continue the renewal
@@ -1400,7 +1409,8 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
     update("invoice", "name_product", $product['name_product'], "username", $user['Processing_value']);
     update("invoice", "Service_time", $product['Service_time'], "username", $user['Processing_value']);
     update("invoice", "Volume", $product['Volume_constraint'], "username", $user['Processing_value']);
-    update("invoice", "price_product", $product['price_product'], "username", $user['Processing_value']);
+    $campaignPrice = applyRenewalCampaignPrice($product['price_product'], $nameloc['Service_location']);
+    update("invoice", "price_product", $campaignPrice['price'], "username", $user['Processing_value']);
     update("user", "Processing_value_one", $codeproduct, "id", $from_id);
     $keyboardextend = json_encode([
         'inline_keyboard' => [
@@ -1413,7 +1423,7 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
             ]
         ]
     ]);
-    $textextend = sprintf($textbotlang['users']['extend']['invoicExtend'], $nameloc['username'], $product['name_product'], $product['price_product'], $product['Service_time'], $product['Volume_constraint']);
+    $textextend = renderRenewalExtendInvoice($campaignPrice, $product, $nameloc, $textbotlang);
     Editmessagetext($from_id, $message_id, $textextend, $keyboardextend);
 } elseif (preg_match('/confirmserivce-(.*)/', $datain, $dataget)) {
     $codeproduct = $dataget[1];
@@ -1447,8 +1457,11 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
     //     step('get_step_payment', $from_id);
     //     return;
     // }
-    if ($user['Balance'] < $product['price_product']) {
-        $Balance_prim = $product['price_product'] - $user['Balance'];
+    // Price was locked into the invoice row when the user picked the product,
+    // so an expiring renewal campaign can't change what they were quoted.
+    $lockedPrice = intval($nameloc['price_product']);
+    if ($user['Balance'] < $lockedPrice) {
+        $Balance_prim = $lockedPrice - $user['Balance'];
         update("user", "Processing_value",     $Balance_prim, "id", $from_id);
         update("user", "Processing_value_one", $nameloc['username'], "id", $from_id);
         update("user", "Processing_value_tow", "extendafterpay|" . $nameloc['username'] . "|" . $codeproduct, "id", $from_id);
@@ -1458,7 +1471,7 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
         return;
     }
     $usernamepanel = $nameloc['username'];
-    $Balance_Low_user = $user['Balance'] - $product['price_product'];
+    $Balance_Low_user = $user['Balance'] - $lockedPrice;
     update("user", "Balance", $Balance_Low_user, "id", $from_id);
     $ManagePanel->ResetUserDataUsage($nameloc['Service_location'], $user['Processing_value']);
     if ($marzban_list_get['type'] == "marzban") {
@@ -1603,7 +1616,7 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
             ]
         ]
     ]);
-    $priceproductformat = number_format($product['price_product']);
+    $priceproductformat = number_format($lockedPrice);
     $balanceformatsell = number_format(select("user", "Balance", "id", $from_id, "select")['Balance']);
     update("invoice", "Status", "active", "id_invoice", $nameloc['id_invoice']);
     update("invoice", "Volume_Warning_Level", "0", "id_invoice", $nameloc['id_invoice']);

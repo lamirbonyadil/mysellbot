@@ -44,7 +44,8 @@ function update($table, $field, $newValue, $whereField = null, $whereValue = nul
         "DiscountSell",
         "affiliates",
         "cancel_service",
-        "category"
+        "category",
+        "RenewalCampaign"
     ];
     if (!in_array($table, $tables)) return;
     if ($whereField !== null) {
@@ -668,14 +669,18 @@ function DirectPayment($order_id)
             // Re-fetch the user's balance after the top-up we just did above
             $user_now = select("user", "*", "id", $Payment_report['id_user'], "select");
 
-            // Safety check: balance must now cover the product price
-            if ($user_now['Balance'] < $product['price_product']) {
+            // The invoice holds the price locked in when the renewal was started
+            // (already discounted if a renewal campaign was active back then).
+            $lockedPrice = intval($nameloc['price_product']);
+
+            // Safety check: balance must now cover the locked price
+            if ($user_now['Balance'] < $lockedPrice) {
                 // Still not enough — just leave the wallet topped up, don't renew
                 return;
             }
 
             // Deduct the renewal price from the wallet
-            $new_balance = $user_now['Balance'] - $product['price_product'];
+            $new_balance = $user_now['Balance'] - $lockedPrice;
             update("user", "Balance", $new_balance, "id", $Payment_report['id_user']);
 
             // Reset data usage on the panel (same as the normal extend flow)
@@ -785,7 +790,7 @@ function DirectPayment($order_id)
             update("invoice", "Volume_Warning_Level", "0", "id_invoice", $nameloc['id_invoice']);
             update("invoice", "Day_Warning_Level", "0", "id_invoice", $nameloc['id_invoice']);
             // Notify the user that the renewal completed automatically
-            $priceproductformat = number_format($product['price_product']);
+            $priceproductformat = number_format($lockedPrice);
             $balanceformatsell  = number_format(select("user", "Balance", "id", $Payment_report['id_user'], "select")['Balance']);
             sendmessage($Payment_report['id_user'], $textbotlang['users']['extend']['thanks'], null, 'HTML');
 
@@ -892,6 +897,87 @@ function addFieldToTable($tableName, $fieldName, $defaultValue = null, $datatype
         $stmt->execute();
     }
     echo "The $fieldName field was added ✅";
+}
+
+function getActiveRenewalCampaign($name_panel)
+{
+    global $pdo;
+    if (empty($name_panel)) {
+        return null;
+    }
+    $stmt = $pdo->prepare("SELECT * FROM RenewalCampaign WHERE name_panel = :name_panel AND expires_at > :now ORDER BY id DESC LIMIT 1");
+    $stmt->bindValue(':name_panel', $name_panel);
+    $stmt->bindValue(':now', time(), PDO::PARAM_INT);
+    $stmt->execute();
+    $campaign = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $campaign === false ? null : $campaign;
+}
+
+function applyRenewalCampaignPrice($price, $name_panel)
+{
+    $original = intval($price);
+    $campaign = getActiveRenewalCampaign($name_panel);
+    if ($campaign === null) {
+        return ['price' => $original, 'original' => $original, 'campaign' => null];
+    }
+    $discounted = intval(round($original - ($original * intval($campaign['percent']) / 100)));
+    if ($discounted < 0) {
+        $discounted = 0;
+    }
+    return ['price' => $discounted, 'original' => $original, 'campaign' => $campaign];
+}
+
+function renderRenewalExtendInvoice($campaignPrice, $product, $nameloc, $textbotlang)
+{
+    if (empty($campaignPrice['campaign'])) {
+        return sprintf(
+            $textbotlang['users']['extend']['invoicExtend'],
+            $nameloc['username'],
+            $product['name_product'],
+            number_format($campaignPrice['price']),
+            $product['Service_time'],
+            $product['Volume_constraint']
+        );
+    }
+    return sprintf(
+        $textbotlang['users']['extend']['campaign'],
+        $nameloc['username'],
+        $product['name_product'],
+        number_format($campaignPrice['original']),
+        $campaignPrice['campaign']['percent'],
+        number_format($campaignPrice['price']),
+        $product['Service_time'],
+        $product['Volume_constraint']
+    );
+}
+
+function queueBroadcast($text, $id_admin = null)
+{
+    // cron/sendmessage.php drains this queue 100 recipients per tick so bulk
+    // sends can't trip Telegram's flood limits. Refuses to start a second
+    // broadcast while one still has pending recipients.
+    global $pdo;
+    $stmt = $pdo->query("SELECT b.id FROM broadcast b WHERE b.status = 'active' AND EXISTS (SELECT 1 FROM broadcast_recipient r WHERE r.broadcast_id = b.id AND r.status = 'pending') LIMIT 1");
+    if ($stmt->fetchColumn() !== false) {
+        return false;
+    }
+    $recipients = select("user", "id", "User_Status", "Active", "FETCH_COLUMN");
+    if (count($recipients) == 0) {
+        return false;
+    }
+    $stmt = $pdo->prepare("INSERT INTO broadcast (text, id_admin, status, created_at) VALUES (?, ?, 'active', ?)");
+    $stmt->execute([$text, $id_admin, time()]);
+    $broadcastid = $pdo->lastInsertId();
+    $stmt = $pdo->prepare("INSERT INTO broadcast_recipient (broadcast_id, chat_id) VALUES (?, ?)");
+    foreach ($recipients as $chatid) {
+        $stmt->execute([$broadcastid, $chatid]);
+    }
+    return $broadcastid;
+}
+
+function queueRenewalCampaignBroadcast($text, $id_admin = null)
+{
+    return queueBroadcast($text, $id_admin) !== false;
 }
 
 function addIndexToTable($tableName, $indexName, $columns)

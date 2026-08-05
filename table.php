@@ -567,6 +567,33 @@ try {
 } catch (Exception $e) {
     file_put_contents("$randomString.txt",$e->getMessage());
 }
+//----------------------- [ RenewalCampaign ] --------------------- //
+try {
+    $result = $connect->query("SHOW TABLES LIKE 'RenewalCampaign'");
+    $table_exists = ($result->num_rows > 0);
+
+    if (!$table_exists) {
+        $result = $connect->query("CREATE TABLE RenewalCampaign (
+        id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        name_panel varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+        percent int(11) NOT NULL,
+        created_at int(11) NOT NULL,
+        expires_at int(11) NOT NULL,
+        end_notified int(1) NOT NULL DEFAULT 0,
+        created_by varchar(200) NULL)
+        ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin");
+        if (!$result) {
+            echo "table RenewalCampaign".mysqli_error($connect);
+        }
+    } else {
+        $result = $connect->query("SHOW COLUMNS FROM RenewalCampaign LIKE 'end_notified'");
+        if ($result->num_rows == 0) {
+            $connect->query("ALTER TABLE RenewalCampaign ADD end_notified int(1) NOT NULL DEFAULT 0");
+        }
+    }
+} catch (Exception $e) {
+    file_put_contents("$randomString.txt",$e->getMessage());
+}
 //-----------------------------------------------------------------
 try {
     $result = $connect->query("SHOW TABLES LIKE 'affiliates'");
@@ -625,6 +652,50 @@ try {
         ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin");
         if (!$result) {
             echo "table category".mysqli_error($connect);
+        }
+    }
+} catch (Exception $e) {
+    file_put_contents('error_log',$e->getMessage());
+}
+
+//----------------------- [ broadcast ] --------------------- //
+try {
+    $result = $connect->query("SHOW TABLES LIKE 'broadcast'");
+    $table_exists = ($result->num_rows > 0);
+
+    if (!$table_exists) {
+        $result = $connect->query("CREATE TABLE broadcast (
+        id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        text TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+        id_admin varchar(200) NULL,
+        status varchar(20) NOT NULL DEFAULT 'active',
+        created_at int(11) NOT NULL)
+        ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin");
+        if (!$result) {
+            echo "table broadcast".mysqli_error($connect);
+        }
+    }
+} catch (Exception $e) {
+    file_put_contents('error_log',$e->getMessage());
+}
+
+//----------------------- [ broadcast_recipient ] --------------------- //
+try {
+    $result = $connect->query("SHOW TABLES LIKE 'broadcast_recipient'");
+    $table_exists = ($result->num_rows > 0);
+
+    if (!$table_exists) {
+        $result = $connect->query("CREATE TABLE broadcast_recipient (
+        id INT(11) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        broadcast_id INT(6) UNSIGNED NOT NULL,
+        chat_id varchar(200) NOT NULL,
+        status varchar(20) NOT NULL DEFAULT 'pending',
+        attempts int(11) NOT NULL DEFAULT 0,
+        sent_at int(11) NULL,
+        INDEX idx_broadcast_status (broadcast_id, status))
+        ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin");
+        if (!$result) {
+            echo "table broadcast_recipient".mysqli_error($connect);
         }
     }
 } catch (Exception $e) {

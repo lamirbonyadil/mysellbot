@@ -278,7 +278,6 @@ if ($text == $textbotlang['Admin']['keyboardadmin']['send_message']) {
     $userdata = json_decode($user['Processing_value'], true);
     if ($text == $textbotlang['Admin']['accept']) {
         step('home', $from_id);
-        $result = select("user", "id", "User_Status", "Active", "fetchAll");
         $Respuseronse = json_encode([
             'inline_keyboard' => [
                 [
@@ -286,13 +285,14 @@ if ($text == $textbotlang['Admin']['keyboardadmin']['send_message']) {
                 ],
             ]
         ]);
-        file_put_contents('cron/users.json', json_encode($result));
-        file_put_contents('cron/info', $user['Processing_value']);
+        if (queueBroadcast($userdata['text'], $userdata['id_admin'] ?? $from_id) === false) {
+            sendmessage($from_id, $textbotlang['Admin']['systemsms']['busysending'], $keyboardadmin, 'HTML');
+            return;
+        }
         sendmessage($from_id, $textbotlang['Admin']['systemsms']['sendingmessage'], $Respuseronse, 'HTML');
     }
 } elseif ($datain == "cancel_sendmessage") {
-    unlink('cron/users.json');
-    unlink('cron/info');
+    $pdo->query("UPDATE broadcast SET status = 'cancelled' WHERE status = 'active'");
     deletemessage($from_id, $message_id);
     sendmessage($from_id, $textbotlang['Admin']['systemsms']['canceledmessage'], null, 'HTML');
 } elseif ($text == $textbotlang['Admin']['systemsms']['forwardbulkbtn']) {
@@ -1395,6 +1395,7 @@ if ($text == $textbotlang['Admin']['keyboardadmin']['manage_panel']) {
     update("marzban_panel", "name_panel", $text, "name_panel", $user['Processing_value']);
     update("invoice", "Service_location", $text, "Service_location", $user['Processing_value']);
     update("product", "Location", $text, "Location", $user['Processing_value']);
+    update("RenewalCampaign", "name_panel", $text, "name_panel", $user['Processing_value']);
     update("user", "Processing_value", $text, "id", $from_id);
     step('home', $from_id);
 } elseif ($text == $textbotlang['Admin']['managepanel']['keyboardpanel']['editurl']) {
@@ -1567,6 +1568,115 @@ if ($text == $textbotlang['Admin']['Discountsell']['remove']) {
     $stmt->execute();
     sendmessage($from_id, $textbotlang['Admin']['Discount']['RemovedCode'], $shopkeyboard, 'HTML');
     step('home', $from_id);
+}
+if ($text == $textbotlang['Admin']['RenewalCampaign']['create']) {
+    sendmessage($from_id, $textbotlang['Admin']['RenewalCampaign']['getpanel'], $json_list_marzban_panel, 'HTML');
+    step('campaign_getpanel', $from_id);
+} elseif ($user['step'] == "campaign_getpanel") {
+    $panelcampaign = select("marzban_panel", "*", "name_panel", $text, "select");
+    if ($panelcampaign == false) {
+        sendmessage($from_id, $textbotlang['Admin']['RenewalCampaign']['invalidpanel'], $json_list_marzban_panel, 'HTML');
+        return;
+    }
+    $runningcampaign = getActiveRenewalCampaign($text);
+    if ($runningcampaign !== null) {
+        $hoursleftcampaign = max(1, ceil(($runningcampaign['expires_at'] - time()) / 3600));
+        sendmessage($from_id, sprintf($textbotlang['Admin']['RenewalCampaign']['alreadyactive'], $text, $runningcampaign['percent'], $hoursleftcampaign), $json_list_marzban_panel, 'HTML');
+        return;
+    }
+    update("user", "Processing_value", $text, "id", $from_id);
+    sendmessage($from_id, $textbotlang['Admin']['RenewalCampaign']['getpercent'], $backadmin, 'HTML');
+    step('campaign_getpercent', $from_id);
+} elseif ($user['step'] == "campaign_getpercent") {
+    if (!ctype_digit($text) || intval($text) < 1 || intval($text) > 99) {
+        sendmessage($from_id, $textbotlang['Admin']['RenewalCampaign']['invalidpercent'], $backadmin, 'HTML');
+        return;
+    }
+    update("user", "Processing_value_one", $text, "id", $from_id);
+    sendmessage($from_id, $textbotlang['Admin']['RenewalCampaign']['gethours'], $backadmin, 'HTML');
+    step('campaign_gethours', $from_id);
+} elseif ($user['step'] == "campaign_gethours") {
+    if (!ctype_digit($text) || intval($text) < 1 || intval($text) > 8760) {
+        sendmessage($from_id, $textbotlang['Admin']['RenewalCampaign']['invalidhours'], $backadmin, 'HTML');
+        return;
+    }
+    $hourscampaign = intval($text);
+    $expirescampaign = time() + $hourscampaign * 3600;
+    $stmt = $pdo->prepare("INSERT INTO RenewalCampaign (name_panel, percent, created_at, expires_at, created_by) VALUES (:name_panel, :percent, :created_at, :expires_at, :created_by)");
+    $stmt->bindValue(':name_panel', $user['Processing_value']);
+    $stmt->bindValue(':percent', intval($user['Processing_value_one']), PDO::PARAM_INT);
+    $stmt->bindValue(':created_at', time(), PDO::PARAM_INT);
+    $stmt->bindValue(':expires_at', $expirescampaign, PDO::PARAM_INT);
+    $stmt->bindValue(':created_by', $from_id);
+    $stmt->execute();
+    $textcampaignsaved = sprintf($textbotlang['Admin']['RenewalCampaign']['saved'], $user['Processing_value'], $user['Processing_value_one'], $hourscampaign);
+    sendmessage($from_id, $textcampaignsaved, $shopkeyboard, 'HTML');
+    step('home', $from_id);
+
+    $textcampaignnotify = sprintf(
+        $textbotlang['Admin']['RenewalCampaign']['notifyusers'],
+        $user['Processing_value'],
+        $user['Processing_value_one'],
+        jdate('Y/m/d - H:i', $expirescampaign)
+    );
+    if (!queueRenewalCampaignBroadcast($textcampaignnotify, $from_id)) {
+        sendmessage($from_id, $textbotlang['Admin']['RenewalCampaign']['notifybusy'], null, 'HTML');
+        return;
+    }
+    sendmessage($from_id, $textbotlang['Admin']['RenewalCampaign']['notifyqueued'], null, 'HTML');
+}
+if ($text == $textbotlang['Admin']['RenewalCampaign']['list']) {
+    $stmt = $pdo->prepare("SELECT * FROM RenewalCampaign c WHERE c.expires_at > :now AND c.id = (SELECT MAX(c2.id) FROM RenewalCampaign c2 WHERE c2.name_panel = c.name_panel) ORDER BY c.expires_at ASC");
+    $stmt->bindValue(':now', time(), PDO::PARAM_INT);
+    $stmt->execute();
+    $activecampaigns = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if (count($activecampaigns) == 0) {
+        sendmessage($from_id, $textbotlang['Admin']['RenewalCampaign']['empty'], $shopkeyboard, 'HTML');
+        return;
+    }
+    $textcampaignlist = $textbotlang['Admin']['RenewalCampaign']['listtitle'];
+    $keyboardcampaignlist = ['inline_keyboard' => []];
+    foreach ($activecampaigns as $activecampaign) {
+        $hoursleft = max(1, ceil(($activecampaign['expires_at'] - time()) / 3600));
+        $textcampaignlist .= "\n\n" . sprintf($textbotlang['Admin']['RenewalCampaign']['listrow'], $activecampaign['name_panel'], $activecampaign['percent'], $hoursleft);
+        $keyboardcampaignlist['inline_keyboard'][] = [
+            ['text' => sprintf($textbotlang['Admin']['RenewalCampaign']['stopbtn'], $activecampaign['name_panel']), 'callback_data' => "campaignstop_" . $activecampaign['id']]
+        ];
+    }
+    sendmessage($from_id, $textcampaignlist, json_encode($keyboardcampaignlist), 'HTML');
+} elseif (preg_match('/campaignstop_(\d+)/', $datain, $dataget)) {
+    $stmt = $pdo->prepare("UPDATE RenewalCampaign SET expires_at = :now WHERE id = :id AND expires_at > :nowcheck");
+    $stmt->bindValue(':now', time(), PDO::PARAM_INT);
+    $stmt->bindValue(':nowcheck', time(), PDO::PARAM_INT);
+    $stmt->bindValue(':id', intval($dataget[1]), PDO::PARAM_INT);
+    $stmt->execute();
+    if ($stmt->rowCount() == 0) {
+        sendmessage($from_id, $textbotlang['Admin']['RenewalCampaign']['notactive'], null, 'HTML');
+        return;
+    }
+    $stoppedcampaign = select("RenewalCampaign", "*", "id", intval($dataget[1]), "select");
+    deletemessage($from_id, $message_id);
+    sendmessage($from_id, sprintf($textbotlang['Admin']['RenewalCampaign']['stopped'], $stoppedcampaign['name_panel']), $shopkeyboard, 'HTML');
+
+    // Announce the end here and mark the row, so the cron that watches for
+    // natural expiry doesn't send a second notice for the same campaign. If
+    // another campaign is still running on the same panel the discount hasn't
+    // actually stopped, so flag the row without announcing.
+    if (getActiveRenewalCampaign($stoppedcampaign['name_panel']) !== null) {
+        $stmt = $pdo->prepare("UPDATE RenewalCampaign SET end_notified = 1 WHERE id = :id");
+        $stmt->bindValue(':id', intval($dataget[1]), PDO::PARAM_INT);
+        $stmt->execute();
+        return;
+    }
+    $textcampaignend = sprintf($textbotlang['Admin']['RenewalCampaign']['notifyend'], $stoppedcampaign['name_panel'], $stoppedcampaign['percent']);
+    if (queueRenewalCampaignBroadcast($textcampaignend, $from_id)) {
+        $stmt = $pdo->prepare("UPDATE RenewalCampaign SET end_notified = 1 WHERE id = :id");
+        $stmt->bindValue(':id', intval($dataget[1]), PDO::PARAM_INT);
+        $stmt->execute();
+        sendmessage($from_id, $textbotlang['Admin']['RenewalCampaign']['notifyqueued'], null, 'HTML');
+    } else {
+        sendmessage($from_id, $textbotlang['Admin']['RenewalCampaign']['notifybusy'], null, 'HTML');
+    }
 }
 if ($text == $textbotlang['Admin']['keyboardadmin']['affiliate_settings']) {
     sendmessage($from_id, $textbotlang['users']['selectoption'], $affiliates, 'HTML');

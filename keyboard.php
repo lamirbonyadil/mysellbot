@@ -223,6 +223,7 @@ $shopkeyboard = json_encode([
         [['text' => $textbotlang['Admin']['managepanel']['keyboardpanel']['setvolume']]],
         [['text' => $textbotlang['Admin']['Discount']['titlebtn']], ['text' => $textbotlang['Admin']['Discount']['titlebtnremove']]],
         [['text' => $textbotlang['Admin']['Discountsell']['create']], ['text' => $textbotlang['Admin']['Discountsell']['remove']]],
+        [['text' => $textbotlang['Admin']['RenewalCampaign']['create']], ['text' => $textbotlang['Admin']['RenewalCampaign']['list']]],
         [['text' => $textbotlang['Admin']['Back-Adminment']]]
     ],
     'resize_keyboard' => true
