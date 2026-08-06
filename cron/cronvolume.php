@@ -141,6 +141,9 @@ $updateStmt = $pdo->prepare(
 $statusStmt = $pdo->prepare(
     "UPDATE invoice SET Status = 'sendedwarn' WHERE id_invoice = ? AND Status = 'active'"
 );
+$endOfVolumeStmt = $pdo->prepare(
+    "UPDATE invoice SET Status = 'end_of_volume', Volume_Last_Checked_At = NOW() WHERE id_invoice = ? AND Status != 'end_of_volume'"
+);
 $touchStmt = $pdo->prepare(
     "UPDATE invoice SET Volume_Last_Checked_At = NOW() WHERE id_invoice = ?"
 );
@@ -169,7 +172,7 @@ foreach ($invoiceRows as $invoiceRow) {
         $touchStmt->execute([$invoiceRow['id_invoice']]);
         continue;
     }
-    if (!in_array($remoteUser['status'] ?? '', ['active', 'limited'])) {
+    if (!in_array($remoteUser['status'] ?? '', ['active', 'on_hold', 'limited'])) {
         $touchStmt->execute([$invoiceRow['id_invoice']]);
         continue;
     }
@@ -211,6 +214,7 @@ foreach ($invoiceRows as $invoiceRow) {
         usleep(TELEGRAM_SEND_DELAY_US);
 
         $updateStmt->execute([4, $invoiceRow['id_invoice']]);
+        $endOfVolumeStmt->execute([$invoiceRow['id_invoice']]);
 
         continue;
     }

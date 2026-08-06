@@ -153,14 +153,11 @@ $updateStmt = $pdo->prepare(
 $statusStmt = $pdo->prepare(
     "UPDATE invoice SET Status = 'sendedwarn' WHERE id_invoice = ? AND Status = 'active'"
 );
+$endOfTimeStmt = $pdo->prepare(
+    "UPDATE invoice SET Status = 'end_of_time', Day_Last_Checked_At = NOW() WHERE id_invoice = ? AND Status != 'end_of_time'"
+);
 $touchStmt = $pdo->prepare(
     "UPDATE invoice SET Day_Last_Checked_At = NOW() WHERE id_invoice = ?"
-);
-// Preserves the original "disabled" behaviour: once the panel reports the
-// account is no longer active/on_hold (e.g. limited/expired), flag the
-// invoice as disabled. Guarded so it's a no-op once already disabled.
-$disableStmt = $pdo->prepare(
-    "UPDATE invoice SET Status = 'disabled', Day_Last_Checked_At = NOW() WHERE id_invoice = ? AND Status != 'disabled'"
 );
 
 foreach ($invoiceRows as $invoiceRow) {
@@ -188,11 +185,8 @@ foreach ($invoiceRows as $invoiceRow) {
         continue;
     }
 
-    if (!in_array($remoteUser['status'] ?? '', ['active', 'on_hold'])) {
-        // Panel no longer considers this service active (e.g. limited,
-        // expired) - flag the invoice as disabled, mirroring the original
-        // behaviour exactly.
-        $disableStmt->execute([$invoiceRow['id_invoice']]);
+    if (!in_array($remoteUser['status'] ?? '', ['active', 'on_hold', 'limited', 'expired'])) {
+        $touchStmt->execute([$invoiceRow['id_invoice']]);
         continue;
     }
 
@@ -234,6 +228,7 @@ foreach ($invoiceRows as $invoiceRow) {
         usleep(TELEGRAM_SEND_DELAY_US);
 
         $updateStmt->execute([4, $invoiceRow['id_invoice']]);
+        $endOfTimeStmt->execute([$invoiceRow['id_invoice']]);
         continue;
     }
 
