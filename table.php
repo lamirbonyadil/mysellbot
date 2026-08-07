@@ -590,6 +590,14 @@ try {
         if ($result->num_rows == 0) {
             $connect->query("ALTER TABLE RenewalCampaign ADD end_notified int(1) NOT NULL DEFAULT 0");
         }
+        $result = $connect->query("SHOW COLUMNS FROM RenewalCampaign LIKE 'reminder_50_sent'");
+        if ($result->num_rows == 0) {
+            $connect->query("ALTER TABLE RenewalCampaign ADD reminder_50_sent int(1) NOT NULL DEFAULT 0");
+        }
+        $result = $connect->query("SHOW COLUMNS FROM RenewalCampaign LIKE 'reminder_95_sent'");
+        if ($result->num_rows == 0) {
+            $connect->query("ALTER TABLE RenewalCampaign ADD reminder_95_sent int(1) NOT NULL DEFAULT 0");
+        }
     }
 } catch (Exception $e) {
     file_put_contents("$randomString.txt",$e->getMessage());

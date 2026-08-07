@@ -32,6 +32,44 @@ register_shutdown_function(function () use ($lockHandle) {
     fclose($lockHandle);
 });
 
+// Fire 50% reminder: halfway through the campaign duration.
+$stmt = $pdo->prepare("SELECT * FROM RenewalCampaign WHERE reminder_50_sent = 0 AND expires_at > :now1 AND :now2 >= created_at + (expires_at - created_at) * 0.50 ORDER BY id ASC LIMIT 1");
+$stmt->bindValue(':now1', time(), PDO::PARAM_INT);
+$stmt->bindValue(':now2', time(), PDO::PARAM_INT);
+$stmt->execute();
+$reminder50campaign = $stmt->fetch(PDO::FETCH_ASSOC);
+if ($reminder50campaign !== false) {
+    $remaining = $reminder50campaign['expires_at'] - time();
+    $hours = floor($remaining / 3600);
+    $minutes = floor(($remaining % 3600) / 60);
+    $text50 = sprintf($textbotlang['Admin']['RenewalCampaign']['reminder50'], $reminder50campaign['name_panel'], $reminder50campaign['percent'], $hours, $minutes);
+    $queued = queueRenewalCampaignBroadcast($text50);
+    if ($queued) {
+        $stmt = $pdo->prepare("UPDATE RenewalCampaign SET reminder_50_sent = 1 WHERE id = :id");
+        $stmt->bindValue(':id', intval($reminder50campaign['id']), PDO::PARAM_INT);
+        $stmt->execute();
+    }
+}
+
+// Fire 95% reminder: 5% of campaign duration remaining.
+$stmt = $pdo->prepare("SELECT * FROM RenewalCampaign WHERE reminder_95_sent = 0 AND expires_at > :now1 AND :now2 >= created_at + (expires_at - created_at) * 0.95 ORDER BY id ASC LIMIT 1");
+$stmt->bindValue(':now1', time(), PDO::PARAM_INT);
+$stmt->bindValue(':now2', time(), PDO::PARAM_INT);
+$stmt->execute();
+$reminder95campaign = $stmt->fetch(PDO::FETCH_ASSOC);
+if ($reminder95campaign !== false) {
+    $remaining = $reminder95campaign['expires_at'] - time();
+    $hours = floor($remaining / 3600);
+    $minutes = floor(($remaining % 3600) / 60);
+    $text95 = sprintf($textbotlang['Admin']['RenewalCampaign']['reminder95'], $reminder95campaign['name_panel'], $reminder95campaign['percent'], $hours, $minutes);
+    $queued = queueRenewalCampaignBroadcast($text95);
+    if ($queued) {
+        $stmt = $pdo->prepare("UPDATE RenewalCampaign SET reminder_95_sent = 1 WHERE id = :id");
+        $stmt->bindValue(':id', intval($reminder95campaign['id']), PDO::PARAM_INT);
+        $stmt->execute();
+    }
+}
+
 // Announce renewal campaigns that ran out on their own. Admin-stopped ones are
 // already announced (and flagged) by admin.php, so they never reach this.
 // The 24h floor keeps a long-idle cron from suddenly announcing the end of
