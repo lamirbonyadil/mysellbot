@@ -154,7 +154,7 @@ $statusStmt = $pdo->prepare(
     "UPDATE invoice SET Status = 'sendedwarn' WHERE id_invoice = ? AND Status = 'active'"
 );
 $endOfTimeStmt = $pdo->prepare(
-    "UPDATE invoice SET Status = 'end_of_time', Day_Last_Checked_At = NOW() WHERE id_invoice = ? AND Status != 'end_of_time'"
+    "UPDATE invoice SET Status = 'end_of_time', expired_at = COALESCE(expired_at, NOW()), Day_Last_Checked_At = NOW() WHERE id_invoice = ? AND Status != 'end_of_time'"
 );
 $touchStmt = $pdo->prepare(
     "UPDATE invoice SET Day_Last_Checked_At = NOW() WHERE id_invoice = ?"

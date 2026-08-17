@@ -369,15 +369,19 @@ try {
      $Check_filde = $connect->query("SHOW COLUMNS FROM invoice LIKE 'time_sell'");
         if (mysqli_num_rows($Check_filde) != 1) {
            $result = $connect->query("ALTER TABLE invoice ADD time_sell VARCHAR(2000)");
-        }    
+        }
         $Check_filde = $connect->query("SHOW COLUMNS FROM invoice LIKE 'user_info'");
         if (mysqli_num_rows($Check_filde) != 1) {
            $result = $connect->query("ALTER TABLE invoice ADD user_info TEXT");
-        }    
+        }
         $Check_filde = $connect->query("SHOW COLUMNS FROM invoice LIKE 'Status'");
         if (mysqli_num_rows($Check_filde) != 1) {
            $result = $connect->query("ALTER TABLE invoice ADD Status VARCHAR(2000)");
-        }    
+        }
+        $Check_filde = $connect->query("SHOW COLUMNS FROM invoice LIKE 'expired_at'");
+        if (mysqli_num_rows($Check_filde) != 1) {
+           $result = $connect->query("ALTER TABLE invoice ADD expired_at TIMESTAMP NULL DEFAULT NULL");
+        }
     }
 } catch (Exception $e) {
     file_put_contents("$randomString.txt",$e->getMessage());

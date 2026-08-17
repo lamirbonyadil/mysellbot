@@ -193,7 +193,7 @@ if (strpos($text, "/start ") !== false) {
     $token = str_replace("/start ", "", $text);
     if ($token === "services") {
         // Redirect straight to My Services page
-        $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn') AND name_product != 'usertest' ORDER BY time_sell DESC LIMIT 10");
+        $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn') AND name_product != 'usertest' AND name_product != 'disabled' ORDER BY time_sell DESC LIMIT 10");
         $stmt->bindParam(':id_user', $from_id);
         $stmt->execute();
         $keyboardlists = ['inline_keyboard' => []];
@@ -440,7 +440,7 @@ if ($text == "/new") {
 }
 #-----------/status (my packages)------------#
 if ($text == "/status") {
-    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time'  OR status = 'end_of_volume' OR status = 'sendedwarn') AND name_product != 'usertest'");
+    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time'  OR status = 'end_of_volume' OR status = 'sendedwarn') AND name_product != 'usertest' AND name_product != 'disabled'");
     $stmt->bindParam(':id_user', $from_id);
     $stmt->execute();
     $invoices = $stmt->rowCount();
@@ -496,7 +496,7 @@ if ($text == "/status") {
 }
 #-----------/renew (renew service)------------#
 if ($text == "/renew") {
-    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time'  OR status = 'end_of_volume' OR status = 'sendedwarn') AND name_product != 'usertest'");
+    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time'  OR status = 'end_of_volume' OR status = 'sendedwarn') AND name_product != 'usertest' AND name_product != 'disabled'");
     $stmt->bindParam(':id_user', $from_id);
     $stmt->execute();
     $invoices = $stmt->rowCount();
@@ -553,7 +553,7 @@ if ($user['step'] == 'get_number') {
 }
 #-----------Purchased services------------#
 if ($text == $datatextbot['text_Purchased_services'] || $datain == "backorder" || $text == "/services") {
-    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time'  OR status = 'end_of_volume' OR status = 'sendedwarn') AND name_product != 'usertest'");
+    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time'  OR status = 'end_of_volume' OR status = 'sendedwarn') AND name_product != 'usertest' AND name_product != 'disabled'");
     $stmt->bindParam(':id_user', $from_id);
     $stmt->execute();
     $invoices = $stmt->rowCount();
@@ -805,7 +805,7 @@ if ($user['step'] == "getusernameinfo") {
         return;
     }
 
-    $stmt_check_bound = $pdo->prepare("SELECT 1 FROM invoice WHERE username = :username AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn') AND name_product != 'usertest' LIMIT 1");
+    $stmt_check_bound = $pdo->prepare("SELECT 1 FROM invoice WHERE username = :username AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn') AND name_product != 'usertest' AND name_product != 'disabled' LIMIT 1");
     $stmt_check_bound->execute([':username' => $text]);
 
     if ($stmt_check_bound->fetchColumn()) {
@@ -1648,6 +1648,7 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
     $priceproductformat = number_format($lockedPrice);
     $balanceformatsell = number_format(select("user", "Balance", "id", $from_id, "select")['Balance']);
     update("invoice", "Status", "active", "id_invoice", $nameloc['id_invoice']);
+    update("invoice", "expired_at", NULL, "id_invoice", $nameloc['id_invoice']);
     update("invoice", "Volume_Warning_Level", "0", "id_invoice", $nameloc['id_invoice']);
     update("invoice", "Day_Warning_Level", "0", "id_invoice", $nameloc['id_invoice']);
     sendmessage($from_id, $textbotlang['users']['extend']['thanks'], $keyboardextendfnished, 'HTML');

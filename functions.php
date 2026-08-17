@@ -602,6 +602,7 @@ function DirectPayment($order_id)
             ]);
         }
         update("invoice", "status", "active", "username", $get_invoice['username']);
+        update("invoice", "expired_at", NULL, "username", $get_invoice['username']);
         if ($Payment_report['Payment_Method'] == "cart to cart") {
             update("invoice", "Status", "active", "id_invoice", $get_invoice['id_invoice']);
         }
@@ -787,6 +788,7 @@ function DirectPayment($order_id)
 
             // Mark the invoice as active again
             update("invoice", "Status", "active", "id_invoice", $nameloc['id_invoice']);
+            update("invoice", "expired_at", NULL, "id_invoice", $nameloc['id_invoice']);
             update("invoice", "Volume_Warning_Level", "0", "id_invoice", $nameloc['id_invoice']);
             update("invoice", "Day_Warning_Level", "0", "id_invoice", $nameloc['id_invoice']);
             // Notify the user that the renewal completed automatically
@@ -985,7 +987,7 @@ function activateReservedPackage($pdo, $ManagePanel, $invoiceRow, $textbotlang)
 
     try {
         $pdo->beginTransaction();
-        $upd = $pdo->prepare("UPDATE invoice SET name_product = :name, Service_time = :stime, Volume = :vol, price_product = :price, Status = 'active', Volume_Warning_Level = 0, Day_Warning_Level = 0 WHERE id_invoice = :iid");
+        $upd = $pdo->prepare("UPDATE invoice SET name_product = :name, Service_time = :stime, Volume = :vol, price_product = :price, Status = 'active', expired_at = NULL, Volume_Warning_Level = 0, Day_Warning_Level = 0 WHERE id_invoice = :iid");
         $upd->execute([
             ':name'  => $reservation['name_product'],
             ':stime' => $reservation['Service_time'],
