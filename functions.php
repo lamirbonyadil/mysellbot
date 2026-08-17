@@ -809,7 +809,207 @@ function DirectPayment($order_id)
                 sendmessage($setting['Channel_Report'], $text_report, null, 'HTML');
             }
         }
+
+        if ($steppay[0] == "reserveafterpay") {
+            $reserve_username = $steppay[1] ?? '';
+            $reserve_code     = $steppay[2] ?? '';
+            // $steppay[3] is the campaign-locked price stored at invoice time (optional for back-compat)
+            $reserve_locked_price = isset($steppay[3]) ? intval($steppay[3]) : null;
+
+            if (empty($reserve_username) || empty($reserve_code)) {
+                return;
+            }
+
+            $nameloc = select("invoice", "*", "username", $reserve_username, "select");
+            if ($nameloc == false) {
+                return;
+            }
+
+            $stmt = $pdo->prepare("SELECT * FROM product WHERE (Location = :Location OR location = '/all') AND code_product = :code_product LIMIT 1");
+            $stmt->bindValue(':Location', $nameloc['Service_location']);
+            $stmt->bindValue(':code_product', $reserve_code);
+            $stmt->execute();
+            $product = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($product == false) {
+                return;
+            }
+
+            // Use the locked price if present; cap at full price to prevent manipulation
+            $reservePrice = ($reserve_locked_price !== null)
+                ? min($reserve_locked_price, intval($product['price_product']))
+                : intval($product['price_product']);
+
+            try {
+                $pdo->beginTransaction();
+
+                // Re-check for duplicate and re-fetch balance inside the transaction
+                $existsStmt = $pdo->prepare("SELECT id FROM reserved_package WHERE invoice_id = :iid AND status = 'pending' LIMIT 1");
+                $existsStmt->bindValue(':iid', $nameloc['id_invoice']);
+                $existsStmt->execute();
+                if ($existsStmt->fetchColumn()) {
+                    $pdo->rollBack();
+                    return;
+                }
+
+                $user_now = select("user", "*", "id", $Payment_report['id_user'], "select");
+                if (intval($user_now['Balance']) < $reservePrice) {
+                    $pdo->rollBack();
+                    return;
+                }
+
+                $new_balance = intval($user_now['Balance']) - $reservePrice;
+                update("user", "Balance", $new_balance, "id", $Payment_report['id_user']);
+
+                $insStmt = $pdo->prepare("INSERT INTO reserved_package (invoice_id, id_user, username, code_product, name_product, price_product, Service_time, Volume, status) VALUES (:iid, :uid, :uname, :code, :name, :price, :stime, :vol, 'pending')");
+                $insStmt->execute([
+                    ':iid'   => $nameloc['id_invoice'],
+                    ':uid'   => $Payment_report['id_user'],
+                    ':uname' => $reserve_username,
+                    ':code'  => $reserve_code,
+                    ':name'  => $product['name_product'],
+                    ':price' => $reservePrice,
+                    ':stime' => intval($product['Service_time']),
+                    ':vol'   => intval($product['Volume_constraint']),
+                ]);
+
+                $pdo->commit();
+            } catch (Throwable $e) {
+                $pdo->rollBack();
+                error_log('reserveafterpay: transaction failed: ' . $e->getMessage());
+                return;
+            }
+
+            $confirmedText = sprintf(
+                $textbotlang['users']['reserve']['confirmed'],
+                $product['name_product'],
+                $reserve_username
+            );
+            sendmessage($Payment_report['id_user'], $confirmedText, null, 'HTML');
+
+            $text_report = sprintf(
+                $textbotlang['Admin']['Report']['reserve'],
+                $Payment_report['id_user'],
+                $user_now['username'],
+                $product['name_product'],
+                number_format($reservePrice),
+                $reserve_username,
+                number_format($new_balance),
+                $nameloc['Service_location']
+            );
+            if (isset($setting['Channel_Report']) && strlen($setting['Channel_Report']) > 0) {
+                sendmessage($setting['Channel_Report'], $text_report, null, 'HTML');
+            }
+        }
     }
+}
+function activateReservedPackage($pdo, $ManagePanel, $invoiceRow, $textbotlang)
+{
+    $stmt = $pdo->prepare("SELECT * FROM reserved_package WHERE invoice_id = :iid AND status = 'pending' LIMIT 1");
+    $stmt->bindValue(':iid', $invoiceRow['id_invoice']);
+    $stmt->execute();
+    $reservation = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$reservation) {
+        return false;
+    }
+
+    $panelRow = select("marzban_panel", "*", "name_panel", $invoiceRow['Service_location'], "select");
+    if (!$panelRow) {
+        return false;
+    }
+
+    $ManagePanel->ResetUserDataUsage($invoiceRow['Service_location'], $invoiceRow['username']);
+
+    $stime    = intval($reservation['Service_time']);
+    $volBytes = intval($reservation['Volume']) * pow(1024, 3);
+    $panelOk  = false;
+
+    if ($panelRow['type'] == "marzban") {
+        $newDate = ($stime == 0) ? 0 : strtotime(date("Y-m-d H:i:s", strtotime("+{$stime}day")));
+        $result  = $ManagePanel->Modifyuser($invoiceRow['username'], $invoiceRow['Service_location'], [
+            "expire"     => $newDate,
+            "data_limit" => $volBytes,
+        ]);
+        $panelOk = isset($result['username']);
+    } elseif ($panelRow['type'] == "marzneshin") {
+        $newDate = ($stime == 0) ? 0 : strtotime(date("Y-m-d H:i:s", strtotime("+{$stime}day")));
+        $result  = $ManagePanel->Modifyuser($invoiceRow['username'], $invoiceRow['Service_location'], [
+            "expire_date" => $newDate,
+            "data_limit"  => $volBytes,
+        ]);
+        $panelOk = isset($result['username']);
+    } elseif ($panelRow['type'] == "x-ui_single") {
+        $newDate = strtotime(date("Y-m-d H:i:s", strtotime("+{$stime}day"))) * 1000;
+        $result  = $ManagePanel->Modifyuser($invoiceRow['username'], $invoiceRow['Service_location'], [
+            'settings' => json_encode(['clients' => [["totalGB" => $volBytes, "expiryTime" => $newDate, "enable" => true]]]),
+        ]);
+        $panelOk = isset($result['username']);
+    } elseif ($panelRow['type'] == "alireza") {
+        $newDate = strtotime(date("Y-m-d H:i:s", strtotime("+{$stime}day"))) * 1000;
+        $result  = $ManagePanel->Modifyuser($invoiceRow['username'], $invoiceRow['Service_location'], [
+            'id'       => intval($panelRow['inboundid']),
+            'settings' => json_encode(['clients' => [["totalGB" => $volBytes, "expiryTime" => $newDate, "enable" => true]]]),
+        ]);
+        $panelOk = isset($result['username']);
+    } elseif ($panelRow['type'] == "s_ui") {
+        $newDate = ($stime == 0) ? 0 : strtotime(date("Y-m-d H:i:s", strtotime("+{$stime}day")));
+        $result  = $ManagePanel->Modifyuser($invoiceRow['username'], $invoiceRow['Service_location'], [
+            "volume" => $volBytes,
+            "expiry" => $newDate,
+            "enable" => true,
+        ]);
+        $panelOk = isset($result['username']);
+    } elseif ($panelRow['type'] == "wgdashboard") {
+        $datauser = get_userwg($invoiceRow['username'], $invoiceRow['Service_location']);
+        allowAccessPeers($invoiceRow['Service_location'], $invoiceRow['username']);
+        $jobs = $datauser['jobs'] ?? [];
+        $dateJob = null;
+        $dataJob = null;
+        foreach ($jobs as $job) {
+            if ($job['Field'] == "date")       $dateJob = $job;
+            if ($job['Field'] == "total_data") $dataJob = $job;
+        }
+        if ($dateJob !== null) deletejob($invoiceRow['Service_location'], ["Job" => $dateJob]);
+        if ($dataJob !== null) deletejob($invoiceRow['Service_location'], ["Job" => $dataJob]);
+        if ($stime != 0) {
+            $newDate = strtotime(date("Y-m-d H:i:s", strtotime("+{$stime}day")));
+            setjob($invoiceRow['Service_location'], "date", date("Y-m-d H:i:s", $newDate), $datauser['id']);
+        }
+        setjob($invoiceRow['Service_location'], "total_data", intval($reservation['Volume']), $datauser['id']);
+        $panelOk = true;
+    }
+
+    if (!$panelOk) {
+        error_log("activateReservedPackage: panel call failed for reservation {$reservation['id']} / invoice {$invoiceRow['id_invoice']}");
+        return false;
+    }
+
+    try {
+        $pdo->beginTransaction();
+        $upd = $pdo->prepare("UPDATE invoice SET name_product = :name, Service_time = :stime, Volume = :vol, price_product = :price, Status = 'active', Volume_Warning_Level = 0, Day_Warning_Level = 0 WHERE id_invoice = :iid");
+        $upd->execute([
+            ':name'  => $reservation['name_product'],
+            ':stime' => $reservation['Service_time'],
+            ':vol'   => $reservation['Volume'],
+            ':price' => $reservation['price_product'],
+            ':iid'   => $invoiceRow['id_invoice'],
+        ]);
+        $markStmt = $pdo->prepare("UPDATE reserved_package SET status = 'activated', activated_at = NOW() WHERE id = :id");
+        $markStmt->execute([':id' => $reservation['id']]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        error_log("activateReservedPackage: DB commit failed for reservation {$reservation['id']}: " . $e->getMessage());
+        return false;
+    }
+
+    $activatedText = sprintf(
+        $textbotlang['users']['reserve']['activated'],
+        $reservation['name_product'],
+        $invoiceRow['username']
+    );
+    sendmessage($invoiceRow['id_user'], $activatedText, null, 'HTML');
+
+    return true;
 }
 function savedata($type, $namefiled, $valuefiled)
 {
@@ -877,6 +1077,12 @@ function channel($id_channel)
 function addFieldToTable($tableName, $fieldName, $defaultValue = null, $datatype = "VARCHAR(500)")
 {
     global $pdo;
+    // Whitelist identifiers: only letters, digits, and underscores allowed.
+    // PDO cannot parameterize table/column names, so we validate them here.
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $tableName) || !preg_match('/^[a-zA-Z0-9_]+$/', $fieldName)) {
+        error_log("addFieldToTable: invalid identifier tableName='$tableName' fieldName='$fieldName'");
+        return;
+    }
     $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM information_schema.tables WHERE table_name = :tableName");
     $stmt->bindParam(':tableName', $tableName);
     $stmt->execute();
@@ -888,11 +1094,11 @@ function addFieldToTable($tableName, $fieldName, $defaultValue = null, $datatype
     $filedExists = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($filedExists['count'] != 0)
         return;
-    $query = "ALTER TABLE $tableName ADD $fieldName $datatype";
+    $query = "ALTER TABLE `$tableName` ADD `$fieldName` $datatype";
     $statement = $pdo->prepare($query);
     $statement->execute();
     if ($defaultValue != null) {
-        $stmt = $pdo->prepare("UPDATE $tableName SET $fieldName= ?");
+        $stmt = $pdo->prepare("UPDATE `$tableName` SET `$fieldName` = ?");
         $stmt->bindParam(1, $defaultValue);
         $stmt->execute();
     }

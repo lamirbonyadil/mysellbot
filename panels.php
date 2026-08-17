@@ -753,7 +753,7 @@ class ManagePanel
         global $connect;
         $Get_Data_Panel = select("marzban_panel", "*", "name_panel", $name_panel, "select");
         if ($Get_Data_Panel['type'] == "marzban") {
-            Modifyuser($name_panel, $username, $config);
+            return Modifyuser($name_panel, $username, $config);
         } elseif ($Get_Data_Panel['type'] == "marzneshin") {
             $UsernameData = getuserm($username, $Get_Data_Panel['name_panel']);
             if (!isset($config['expire_date'])) {
@@ -761,7 +761,7 @@ class ManagePanel
             }
             $config['expire_strategy'] = $UsernameData['expire_strategy'];
             $config['username'] = $username;
-            Modifyuserm($name_panel, $username, $config);
+            return Modifyuserm($name_panel, $username, $config);
         } elseif ($Get_Data_Panel['type'] == "x-ui_single") {
             $clients = get_Client($username, $name_panel);
             $configs = array(
@@ -786,6 +786,7 @@ class ManagePanel
             );
             $configs['settings'] = json_encode(array_replace_recursive(json_decode($configs['settings'], true), json_decode($config['settings'], true)));
             updateClient($Get_Data_Panel['name_panel'], $configs, $clients['uuid']);
+            return ['username' => $username];
         } elseif ($Get_Data_Panel['type'] == "alireza") {
             $clients = get_clinetsalireza($username, $name_panel);
             $configs = array(
@@ -809,7 +810,8 @@ class ManagePanel
                 ),
             );
             $configs['settings'] = json_encode(array_replace_recursive(json_decode($configs['settings'], true), json_decode($config['settings'], true)));
-            $updateinbound = updateClientalireza($Get_Data_Panel['name_panel'], $username, $configs);
+            updateClientalireza($Get_Data_Panel['name_panel'], $username, $configs);
+            return ['username' => $username];
         } elseif ($Get_Data_Panel['type'] == "s_ui") {
             $clients = GetClientsS_UI($username, $name_panel);
             if (!$clients)
@@ -832,7 +834,8 @@ class ManagePanel
             );
             $configs['data'] = array_merge($configs['data'], $config);
             $configs['data'] = json_encode($configs['data'], true);
-            return updateClientS_ui($Get_Data_Panel['name_panel'], $configs);
+            $res = updateClientS_ui($Get_Data_Panel['name_panel'], $configs);
+            return $res !== null ? ['username' => $username] : [];
         } elseif ($Get_Data_Panel['type'] == "WGDashboard") {
             $data_user = get_userwg($username, $name_panel);
             $configs = array(

@@ -158,11 +158,16 @@ function buildInvoiceContext(array $user): string
 {
     $tow = $user['Processing_value_tow'] ?? '';
     $one = $user['Processing_value_one'] ?? '';
-    // Pass context along for any recognised after-pay flow
-    if ($tow !== '' && $tow !== '0' && $tow !== 'none') {
-        return "{$tow}|{$one}";
+    if ($tow === '' || $tow === '0' || $tow === 'none') {
+        return "0|0";
     }
-    return "0|0";
+    // These flows already embed all context inside $tow; don't append $one
+    $selfContained = ['reserveafterpay', 'extendafterpay', 'extraVolumeafterpay'];
+    $prefix = explode('|', $tow)[0];
+    if (in_array($prefix, $selfContained, true)) {
+        return $tow;
+    }
+    return "{$tow}|{$one}";
 }
 
 #---------channel--------------#
@@ -1196,12 +1201,21 @@ if (preg_match('/product_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
         if (count($tempArray) > 0) {
             $keyboardsetting['inline_keyboard'][] = $tempArray;
         }
+        $keyboardsetting['inline_keyboard'][] = [['text' => $textbotlang['users']['reserve']['btn'], 'callback_data' => 'reserveservice_' . $username]];
         $keyboardsetting['inline_keyboard'][] = [['text' => $textbotlang['users']['status']['backlist'], 'callback_data' => 'backorder']];
         $keyboardsetting = json_encode($keyboardsetting);
+
+        // Check for pending reservation
+        $rStmt = $pdo->prepare("SELECT name_product FROM reserved_package WHERE invoice_id = :iid AND status = 'pending' LIMIT 1");
+        $rStmt->bindValue(':iid', $nameloc['id_invoice']);
+        $rStmt->execute();
+        $pendingReserve = $rStmt->fetch(PDO::FETCH_ASSOC);
+        $reserveStatus = $pendingReserve ? $pendingReserve['name_product'] : '-';
+
         if ($marzban_list_get['type'] == "mikrotik") {
-            $textinfo = sprintf($textbotlang['users']['status']['InfoSerivceActive_mikrotik'], $status_var, $DataUserOut['username'], $DataUserOut['subscription_url'], $nameloc['Service_location'], $nameloc['id_invoice'], $LastTraffic, $usedTrafficGb, $expirationDate, $day);
+            $textinfo = sprintf($textbotlang['users']['status']['InfoSerivceActive_mikrotik'], $status_var, $DataUserOut['username'], $DataUserOut['subscription_url'], $nameloc['Service_location'], $nameloc['id_invoice'], $LastTraffic, $usedTrafficGb, $expirationDate, $day, $reserveStatus);
         } else {
-            $textinfo = sprintf($textbotlang['users']['status']['InfoSerivceActive'], $status_var, $DataUserOut['username'], $nameloc['Service_location'], $nameloc['id_invoice'], $lastonline, $LastTraffic, $usedTrafficGb, $expirationDate, $day);
+            $textinfo = sprintf($textbotlang['users']['status']['InfoSerivceActive'], $status_var, $DataUserOut['username'], $nameloc['Service_location'], $nameloc['id_invoice'], $lastonline, $LastTraffic, $usedTrafficGb, $expirationDate, $day, $reserveStatus);
         }
     }
     Editmessagetext($from_id, $message_id, $textinfo, $keyboardsetting);
@@ -1279,6 +1293,14 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
         sendmessage($from_id, $textbotlang['users']['status']['error_onhold'], null, 'html');
         return;
     }
+    $rStmt = $pdo->prepare("SELECT name_product FROM reserved_package WHERE invoice_id = :iid AND status = 'pending' LIMIT 1");
+    $rStmt->bindValue(':iid', $nameloc['id_invoice']);
+    $rStmt->execute();
+    $pendingReserve = $rStmt->fetch(PDO::FETCH_ASSOC);
+    if ($pendingReserve) {
+        sendmessage($from_id, sprintf($textbotlang['users']['reserve']['blocked_extend'], $pendingReserve['name_product']), null, 'HTML');
+        return;
+    }
     update("user", "Processing_value", $username, "id", $from_id);
 
     // Save a snapshot of the panel's current usage/expiry so we can warn the
@@ -1295,9 +1317,16 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
     $stmt->bindValue(':Location', $nameloc['Service_location']);
     $stmt->execute();
     $productextend = ['inline_keyboard' => []];
+    $extendCampaignForPrices = getActiveRenewalCampaign($nameloc['Service_location']);
     while ($result = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        if ($extendCampaignForPrices !== null) {
+            $discounted = intval(round($result['price_product'] - ($result['price_product'] * intval($extendCampaignForPrices['percent']) / 100)));
+            $priceLabel = number_format($discounted) . ' تومان';
+        } else {
+            $priceLabel = number_format($result['price_product']) . ' تومان';
+        }
         $productextend['inline_keyboard'][] = [
-            ['text' => $result['name_product'], 'callback_data' => "serviceextendselect_" . $result['code_product']]
+            ['text' => $result['name_product'] . ' - ' . $priceLabel, 'callback_data' => "serviceextendselect_" . $result['code_product']]
         ];
     }
     $productextend['inline_keyboard'][] = [
@@ -1624,6 +1653,266 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
     sendmessage($from_id, $textbotlang['users']['extend']['thanks'], $keyboardextendfnished, 'HTML');
     $text_report = sprintf($textbotlang['Admin']['Report']['extend'], $from_id, $username, $product['name_product'], $priceproductformat, $usernamepanel, $balanceformatsell, $nameloc['Service_location']);
     if (isset($setting['Channel_Report']) && strlen($setting['Channel_Report']) > 0) {
+        sendmessage($setting['Channel_Report'], $text_report, null, 'HTML');
+    }
+} elseif (preg_match('/reserveservice_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
+    $username = $dataget[1];
+    $nameloc  = select("invoice", "*", "username", $username, "select");
+    if ($nameloc == false) {
+        sendmessage($from_id, $textbotlang['users']['extend']['error2'], null, 'HTML');
+        return;
+    }
+    $stmt = $pdo->prepare("SELECT * FROM reserved_package WHERE invoice_id = :iid AND status = 'pending' LIMIT 1");
+    $stmt->bindValue(':iid', $nameloc['id_invoice']);
+    $stmt->execute();
+    $reservation = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($reservation) {
+        $hasReserveText = sprintf(
+            $textbotlang['users']['reserve']['hasreserve'],
+            $reservation['name_product'],
+            number_format($reservation['price_product']),
+            intval($reservation['Volume']),
+            intval($reservation['Service_time'])
+        );
+        $kb = json_encode(['inline_keyboard' => [
+            [['text' => $textbotlang['users']['reserve']['cancel_btn'], 'callback_data' => 'cancelreserve_' . $username]],
+            [['text' => $textbotlang['users']['reserve']['back_to_service'], 'callback_data' => 'product_' . $username]],
+        ]]);
+        Editmessagetext($from_id, $message_id, $hasReserveText, $kb);
+    } else {
+        $stmt2 = $pdo->prepare("SELECT * FROM product WHERE (Location = :Location OR location = '/all') ORDER BY price_product ASC");
+        $stmt2->bindValue(':Location', $nameloc['Service_location']);
+        $stmt2->execute();
+        $products = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+
+        $reserveCampaign = getActiveRenewalCampaign($nameloc['Service_location']);
+        $kbRows = [];
+        foreach ($products as $p) {
+            if ($reserveCampaign !== null) {
+                $discountedPrice = intval(round($p['price_product'] - ($p['price_product'] * intval($reserveCampaign['percent']) / 100)));
+                $priceLabel = number_format($discountedPrice) . ' تومان';
+            } else {
+                $priceLabel = number_format($p['price_product']) . ' تومان';
+            }
+            $kbRows[] = [['text' => $p['name_product'] . ' - ' . $priceLabel, 'callback_data' => 'reserveselect_' . $username . '_' . $p['code_product']]];
+        }
+        $kbRows[] = [['text' => $textbotlang['users']['reserve']['back_to_service'], 'callback_data' => 'product_' . $username]];
+        $kb = json_encode(['inline_keyboard' => $kbRows]);
+        Editmessagetext($from_id, $message_id, $textbotlang['users']['reserve']['selectservice'], $kb);
+    }
+} elseif (preg_match('/reserveselect_([a-zA-Z0-9_.-]+)_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
+    $username = $dataget[1];
+    $code     = $dataget[2];
+    $nameloc  = select("invoice", "*", "username", $username, "select");
+    if ($nameloc == false) {
+        sendmessage($from_id, $textbotlang['users']['extend']['error2'], null, 'HTML');
+        return;
+    }
+    $stmt = $pdo->prepare("SELECT * FROM product WHERE (Location = :Location OR location = '/all') AND code_product = :code LIMIT 1");
+    $stmt->bindValue(':Location', $nameloc['Service_location']);
+    $stmt->bindValue(':code', $code);
+    $stmt->execute();
+    $product = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($product == false) {
+        sendmessage($from_id, $textbotlang['users']['extend']['error2'], null, 'HTML');
+        return;
+    }
+    $reserveInvoiceCampaign = applyRenewalCampaignPrice($product['price_product'], $nameloc['Service_location']);
+    $reserveInvoicePrice = $reserveInvoiceCampaign['price'];
+    update("user", "Processing_value_one", $username, "id", $from_id);
+    if ($reserveInvoiceCampaign['campaign'] !== null) {
+        $invoiceText = sprintf(
+            $textbotlang['users']['reserve']['invoice_campaign'],
+            $username,
+            $product['name_product'],
+            number_format($reserveInvoiceCampaign['original']),
+            $reserveInvoiceCampaign['campaign']['percent'],
+            number_format($reserveInvoicePrice),
+            $product['Service_time'],
+            $product['Volume_constraint']
+        );
+    } else {
+        $invoiceText = sprintf(
+            $textbotlang['users']['reserve']['invoice'],
+            $username,
+            $product['name_product'],
+            number_format($reserveInvoicePrice),
+            $product['Service_time'],
+            $product['Volume_constraint']
+        );
+    }
+    $kb = json_encode(['inline_keyboard' => [
+        [['text' => $textbotlang['users']['reserve']['confirm_btn'], 'callback_data' => 'confirmreserve-' . $code . '-' . $reserveInvoicePrice]],
+        [['text' => $textbotlang['users']['reserve']['back_to_service'], 'callback_data' => 'reserveservice_' . $username]],
+    ]]);
+    Editmessagetext($from_id, $message_id, $invoiceText, $kb);
+} elseif (preg_match('/confirmreserve-([a-zA-Z0-9_.-]+)-([0-9]+)/', $datain, $dataget)) {
+    $codeproduct = $dataget[1];
+    $reservePrice = intval($dataget[2]);
+    $username    = $user['Processing_value_one'];
+    if (empty($username)) {
+        sendmessage($from_id, $textbotlang['users']['extend']['error2'], null, 'HTML');
+        return;
+    }
+    $nameloc = select("invoice", "*", "username", $username, "select");
+    if ($nameloc == false) {
+        sendmessage($from_id, $textbotlang['users']['extend']['error2'], null, 'HTML');
+        return;
+    }
+    $existsStmt = $pdo->prepare("SELECT id FROM reserved_package WHERE invoice_id = :iid AND status = 'pending' LIMIT 1");
+    $existsStmt->bindValue(':iid', $nameloc['id_invoice']);
+    $existsStmt->execute();
+    if ($existsStmt->fetchColumn()) {
+        sendmessage($from_id, $textbotlang['users']['extend']['error2'], null, 'HTML');
+        return;
+    }
+    $stmt = $pdo->prepare("SELECT * FROM product WHERE (Location = :Location OR location = '/all') AND code_product = :code LIMIT 1");
+    $stmt->bindValue(':Location', $nameloc['Service_location']);
+    $stmt->bindValue(':code', $codeproduct);
+    $stmt->execute();
+    $product = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($product == false) {
+        sendmessage($from_id, $textbotlang['users']['extend']['error2'], null, 'HTML');
+        return;
+    }
+    // $reservePrice comes from the callback data (campaign-discounted price locked at invoice time)
+    // Cap it at the product's current price to prevent manipulation via forged callback data
+    $reservePrice = min($reservePrice, intval($product['price_product']));
+    if ($user['Balance'] < $reservePrice) {
+        $Balance_prim = $reservePrice - $user['Balance'];
+        update("user", "Processing_value",     $Balance_prim,                                                              "id", $from_id);
+        update("user", "Processing_value_tow", "reserveafterpay|" . $username . "|" . $codeproduct . "|" . $reservePrice, "id", $from_id);
+        sendmessage($from_id, $textbotlang['users']['sell']['None-credit'], $step_payment, 'HTML');
+        sendmessage($from_id, $textbotlang['users']['sell']['selectpayment'], $backuser, 'HTML');
+        step('get_step_payment', $from_id);
+        return;
+    }
+    try {
+        $pdo->beginTransaction();
+        // Re-check for a race: another tab may have confirmed while we were here
+        $raceStmt = $pdo->prepare("SELECT id FROM reserved_package WHERE invoice_id = :iid AND status = 'pending' LIMIT 1");
+        $raceStmt->bindValue(':iid', $nameloc['id_invoice']);
+        $raceStmt->execute();
+        if ($raceStmt->fetchColumn()) {
+            $pdo->rollBack();
+            sendmessage($from_id, $textbotlang['users']['extend']['error2'], null, 'HTML');
+            return;
+        }
+        $freshUser   = select("user", "Balance", "id", $from_id, "select");
+        $new_balance = intval($freshUser['Balance']) - $reservePrice;
+        update("user", "Balance", $new_balance, "id", $from_id);
+        $insStmt = $pdo->prepare("INSERT INTO reserved_package (invoice_id, id_user, username, code_product, name_product, price_product, Service_time, Volume, status) VALUES (:iid, :uid, :uname, :code, :name, :price, :stime, :vol, 'pending')");
+        $insStmt->execute([
+            ':iid'   => $nameloc['id_invoice'],
+            ':uid'   => $from_id,
+            ':uname' => $username,
+            ':code'  => $codeproduct,
+            ':name'  => $product['name_product'],
+            ':price' => $reservePrice,
+            ':stime' => intval($product['Service_time']),
+            ':vol'   => intval($product['Volume_constraint']),
+        ]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        error_log('confirmreserve: transaction failed: ' . $e->getMessage());
+        sendmessage($from_id, $textbotlang['users']['extend']['error2'], null, 'HTML');
+        return;
+    }
+
+    $confirmedText = sprintf(
+        $textbotlang['users']['reserve']['confirmed'],
+        $product['name_product'],
+        $username
+    );
+    $kb = json_encode(['inline_keyboard' => [
+        [['text' => $textbotlang['users']['reserve']['back_to_service'], 'callback_data' => 'product_' . $username]],
+    ]]);
+    deletemessage($from_id, $message_id);
+    sendmessage($from_id, $confirmedText, $kb, 'HTML');
+
+    $setting = select("setting", "*");
+    $text_report = sprintf(
+        $textbotlang['Admin']['Report']['reserve'],
+        $from_id,
+        $user['username'],
+        $product['name_product'],
+        number_format($reservePrice),
+        $username,
+        number_format($new_balance),
+        $nameloc['Service_location']
+    );
+    if (isset($setting['Channel_Report']) && strlen($setting['Channel_Report']) > 0) {
+        sendmessage($setting['Channel_Report'], $text_report, null, 'HTML');
+    }
+} elseif (preg_match('/cancelreserve_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
+    $username = $dataget[1];
+    $nameloc  = select("invoice", "*", "username", $username, "select");
+    if ($nameloc == false) {
+        sendmessage($from_id, $textbotlang['users']['extend']['error2'], null, 'HTML');
+        return;
+    }
+    $stmt = $pdo->prepare("SELECT * FROM reserved_package WHERE invoice_id = :iid AND status = 'pending' LIMIT 1");
+    $stmt->bindValue(':iid', $nameloc['id_invoice']);
+    $stmt->execute();
+    $reservation = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$reservation) {
+        $kb = json_encode(['inline_keyboard' => [
+            [['text' => $textbotlang['users']['reserve']['back_to_service'], 'callback_data' => 'product_' . $username]],
+        ]]);
+        Editmessagetext($from_id, $message_id, $textbotlang['users']['reserve']['noreserve'], $kb);
+        return;
+    }
+    // Only the owner of the reservation may cancel it
+    if (intval($reservation['id_user']) !== intval($from_id)) {
+        sendmessage($from_id, $textbotlang['users']['extend']['error2'], null, 'HTML');
+        return;
+    }
+    $refund = intval($reservation['price_product']);
+    try {
+        $pdo->beginTransaction();
+        // Guard against concurrent cancel: only proceed if the row is still pending
+        $cancelStmt = $pdo->prepare("UPDATE reserved_package SET status = 'cancelled' WHERE id = :id AND status = 'pending'");
+        $cancelStmt->execute([':id' => $reservation['id']]);
+        if ($cancelStmt->rowCount() === 0) {
+            // Another request already cancelled it — do not refund again
+            $pdo->rollBack();
+            $kb = json_encode(['inline_keyboard' => [
+                [['text' => $textbotlang['users']['reserve']['back_to_service'], 'callback_data' => 'product_' . $username]],
+            ]]);
+            Editmessagetext($from_id, $message_id, $textbotlang['users']['reserve']['noreserve'], $kb);
+            return;
+        }
+        // Re-fetch balance inside the transaction to avoid stale value
+        $freshUser   = select("user", "Balance", "id", $from_id, "select");
+        $new_balance = intval($freshUser['Balance']) + $refund;
+        update("user", "Balance", $new_balance, "id", $from_id);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        error_log('cancelreserve: transaction failed: ' . $e->getMessage());
+        sendmessage($from_id, $textbotlang['users']['extend']['error2'], null, 'HTML');
+        return;
+    }
+
+    $cancelledText = sprintf($textbotlang['users']['reserve']['cancelled'], number_format($refund));
+    $kb = json_encode(['inline_keyboard' => [
+        [['text' => $textbotlang['users']['reserve']['back_to_service'], 'callback_data' => 'product_' . $username]],
+    ]]);
+    Editmessagetext($from_id, $message_id, $cancelledText, $kb);
+    $setting = select("setting", "*");
+    if (isset($setting['Channel_Report']) && strlen($setting['Channel_Report']) > 0) {
+        $text_report = sprintf(
+            $textbotlang['Admin']['Report']['reserve_cancel'],
+            $from_id,
+            $user['username'],
+            $reservation['name_product'],
+            number_format($refund),
+            $username,
+            number_format($new_balance),
+            $nameloc['Service_location']
+        );
         sendmessage($setting['Channel_Report'], $text_report, null, 'HTML');
     }
 } elseif (preg_match('/changelink_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {

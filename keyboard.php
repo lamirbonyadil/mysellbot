@@ -622,6 +622,8 @@ $keyboardcronjob = json_encode([
         [['text' => $textbotlang['Admin']['cron']['test']['active']], ['text' => $textbotlang['Admin']['cron']['test']['disable']]],
         [['text' => $textbotlang['Admin']['cron']['volume']['active']], ['text' => $textbotlang['Admin']['cron']['volume']['disable']]],
         [['text' => $textbotlang['Admin']['cron']['time']['active']], ['text' => $textbotlang['Admin']['cron']['time']['disable']]],
+        [['text' => $textbotlang['Admin']['cron']['reservation']['active']], ['text' => $textbotlang['Admin']['cron']['reservation']['disable']]],
+        [['text' => $textbotlang['Admin']['cron']['inactivity']['active']], ['text' => $textbotlang['Admin']['cron']['inactivity']['disable']]],
         [['text' => $textbotlang['Admin']['cron']['remove']['active']], ['text' => $textbotlang['Admin']['cron']['remove']['disable']]],
         [['text' => $textbotlang['Admin']['cron']['remove']['timeset']]],
         [['text' => $textbotlang['Admin']['Back-Adminment']]]
@@ -678,21 +680,25 @@ function KeyboardProduct($location, $backdata, $MethodUsername, $categoryid = nu
 {
     global $pdo, $textbotlang;
     $query = "SELECT * FROM product WHERE (Location = :location OR Location = '/all') ";
-    if ($categoryid != null) {
-        $query .= "AND category = '$categoryid'";
+    if ($categoryid !== null) {
+        $query .= "AND category = :category";
     }
     $stmt = $pdo->prepare($query);
     $stmt->bindParam(':location', $location, PDO::PARAM_STR);
+    if ($categoryid !== null) {
+        $stmt->bindValue(':category', $categoryid, PDO::PARAM_STR);
+    }
     $stmt->execute();
     $product = ['inline_keyboard' => []];
     while ($result = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $label = $result['name_product'] . ' - ' . number_format($result['price_product']) . ' تومان';
         if ($MethodUsername == $textbotlang['users']['customusername']) {
             $product['inline_keyboard'][] = [
-                ['text' => $result['name_product'], 'callback_data' => "prodcutservices_" . $result['code_product']]
+                ['text' => $label, 'callback_data' => "prodcutservices_" . $result['code_product']]
             ];
         } else {
             $product['inline_keyboard'][] = [
-                ['text' => $result['name_product'], 'callback_data' => "prodcutservice_{$result['code_product']}"]
+                ['text' => $label, 'callback_data' => "prodcutservice_{$result['code_product']}"]
             ];
         }
     }

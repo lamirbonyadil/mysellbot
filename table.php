@@ -709,4 +709,34 @@ try {
 } catch (Exception $e) {
     file_put_contents('error_log',$e->getMessage());
 }
+try {
+    $result = $connect->query("SHOW TABLES LIKE 'reserved_package'");
+    if ($result->num_rows == 0) {
+        $result = $connect->query("CREATE TABLE `reserved_package` (
+            `id` INT(11) NOT NULL AUTO_INCREMENT,
+            `invoice_id` VARCHAR(200) NOT NULL,
+            `id_user` BIGINT(20) NOT NULL,
+            `username` VARCHAR(255) NOT NULL,
+            `code_product` VARCHAR(255) NOT NULL,
+            `name_product` VARCHAR(255) NOT NULL,
+            `price_product` DECIMAL(15,0) NOT NULL DEFAULT '0',
+            `Service_time` INT(11) NOT NULL DEFAULT '0',
+            `Volume` INT(11) NOT NULL DEFAULT '0',
+            `status` ENUM('pending','activated','cancelled') NOT NULL DEFAULT 'pending',
+            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `activated_at` DATETIME NULL DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            KEY `idx_invoice_status` (`invoice_id`(50), `status`),
+            KEY `idx_user_status` (`id_user`, `status`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+        if (!$result) {
+            echo "table reserved_package " . mysqli_error($connect);
+        }
+    } else {
+        $connect->query("ALTER TABLE `reserved_package` MODIFY `invoice_id` VARCHAR(200) NOT NULL;");
+    }
+} catch (Exception $e) {
+    file_put_contents('error_log', $e->getMessage());
+}
+
 $connect->query("ALTER TABLE `user` CHANGE `Processing_value` `Processing_value` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL;");

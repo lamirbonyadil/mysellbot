@@ -31,3 +31,4 @@ Thumbs.db
 composer.lock
 
 .codegraph
+.claude

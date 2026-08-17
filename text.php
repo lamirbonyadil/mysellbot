@@ -144,10 +144,8 @@ $textbotlang['users']['extend']['error2'] = "❌ خطایی در تمدید سر
 $textbotlang['users']['extend']['selectservice'] = " 🛍 محصول خود را برای تمدید انتخاب نمایید";
 $textbotlang['users']['extend']['selectservicecampaign'] = "🎉 <b>تمدید با تخفیف فعال است!</b>
 
-✅ روی تمام محصولات %s%% تخفیف تمدید اعمال می‌شود.
+✅ روی تمام محصولات %s%% تخفیف تمدید اعمال شده است.
 ⏳ پایان تخفیف : %s
-
-❕ قیمت‌های روی دکمه‌ها بدون تخفیف است؛ مبلغ نهایی با تخفیف در فاکتور نمایش داده می‌شود. 
 
  🛍 محصول خود را برای تمدید انتخاب نمایید";
 $textbotlang['users']['extend']['invoicExtend'] = "🧾 فاکتور تمدید شما برای نام کاربری %s ایجاد شد.
@@ -393,26 +391,30 @@ $textbotlang['users']['status']['InfoSerivceActive'] = "وضعیت سرویس: %
 نام کاربری سرویس: <code>%s</code>
 لوکیشن: %s
 کد سرویس: %s
-    
+
 🟢 اخرین زمان اتصال شما : %s
-    
+
 ♾ حجم سرویس : %s
 📥 حجم مصرفی : %s
 
 📅 فعال تا تاریخ : %s (%s)
-    
+
+🎁 بسته رزرو شده: %s
+
 🚫 برای تغییر لینک و قطع دسترسی دیگران کافیست روی گزینه ' بروزرسانی اشتراک ' کلیک کنید.";
 $textbotlang['users']['status']['InfoSerivceActive_mikrotik'] = "وضعیت سرویس : %s
 نام کاربری سرویس : <code>%s</code>
 رمز عبور سرویس: %s
 لوکیشن :%s
 کد سرویس:%s
-    
+
 ♾ حجم سرویس : %s
 📥 حجم مصرفی : %s
 
 📅 فعال تا تاریخ : %s (%s)
-    
+
+🎁 بسته رزرو شده: %s
+
 🚫 برای تغییر لینک و قطع دسترسی دیگران کافیست روی گزینه ' بروزرسانی اشتراک ' کلیک کنید.";
 $textbotlang['users']['status']['RequestRemove'] = "✅  درخواست حذف سرویس را دارم";
 $textbotlang['users']['status']['RemovedService'] = "📌 سرویس با موفقیت حذف شد";
@@ -1335,6 +1337,12 @@ $textbotlang['Admin']['cron']['volume']['dec'] = "✅ کرون جاب فعال �
 $textbotlang['Admin']['cron']['time']['active'] = "فعال شدن کرون زمان";
 $textbotlang['Admin']['cron']['time']['disable'] = "غیر فعال شدن کرون زمان";
 $textbotlang['Admin']['cron']['time']['dec'] = "✅ کرون جاب فعال گردید این کرون هر 1 دقیقه اجرا می شود";
+$textbotlang['Admin']['cron']['reservation']['active'] = "فعال شدن کرون رزرو";
+$textbotlang['Admin']['cron']['reservation']['disable'] = "غیر فعال شدن کرون رزرو";
+$textbotlang['Admin']['cron']['reservation']['dec'] = "✅ کرون جاب فعال گردید این کرون هر 1 دقیقه اجرا می شود";
+$textbotlang['Admin']['cron']['inactivity']['active'] = "فعال شدن کرون عدم فعالیت";
+$textbotlang['Admin']['cron']['inactivity']['disable'] = "غیر فعال شدن کرون عدم فعالیت";
+$textbotlang['Admin']['cron']['inactivity']['dec'] = "✅ کرون جاب فعال گردید این کرون هر 6 ساعت اجرا می شود";
 $textbotlang['Admin']['cron']['remove']['active'] = "فعال شدن کرون حذف";
 $textbotlang['Admin']['cron']['remove']['disable'] = "غیر فعال شدن کرون حذف";
 $textbotlang['Admin']['cron']['remove']['dec'] = "✅ کرون جاب فعال گردید این کرون هر 1 دقیقه اجرا می شود";
@@ -1358,6 +1366,14 @@ $textbotlang['Admin']['cron']['active_manual'] = "📝 بدلیل غیرفعال
 <blockquote>%s</blockquote>
 
 کرون زمان :‌ اطلاع به کاربر در صورتیک ه حجم سرویس به کمتر از یک روز برسد
+
+<blockquote>%s</blockquote>
+
+کرون رزرو :  فعال‌سازی خودکار بسته‌های رزرو شده پس از اتمام سرویس فعلی
+
+<blockquote>%s</blockquote>
+
+کرون عدم فعالیت :  هشدار به کاربران غیرفعال که بیش از 24 ساعت به سرویس متصل نشده‌اند
 
 <blockquote>%s</blockquote>
 
@@ -1401,6 +1417,28 @@ $textbotlang['Admin']['Report']['extend'] = "⭕️ یک کاربر سرویس �
 👤 نام کاربری مشتری در پنل  : %s
 موجودی کاربر :  %s تومان
 لوکیشن سرویس کاربر :  %s";
+$textbotlang['Admin']['Report']['reserve'] = "📌 یک کاربر رزرو سرویس ثبت کرد.
+
+اطلاعات کاربر :
+
+🪪 آیدی عددی : <code>%s</code>
+🪪 نام کاربری : @%s
+🛍 نام محصول : %s
+💰 مبلغ رزرو : %s تومان
+👤 نام کاربری سرویس در پنل : %s
+موجودی کاربر : %s تومان
+لوکیشن سرویس کاربر : %s";
+$textbotlang['Admin']['Report']['reserve_cancel'] = "❌ یک کاربر رزرو سرویس خود را لغو کرد.
+
+اطلاعات کاربر :
+
+🪪 آیدی عددی : <code>%s</code>
+🪪 نام کاربری : @%s
+🛍 نام محصول : %s
+💰 مبلغ استرداد : %s تومان
+👤 نام کاربری سرویس در پنل : %s
+موجودی کاربر : %s تومان
+لوکیشن سرویس کاربر : %s";
 $textbotlang['Admin']['Report']['Extra_volume'] = "⭕️ یک کاربر حجم اضافه خریده است
  اطلاعات کاربر : 
 🪪 آیدی عددی : %s
@@ -1478,10 +1516,24 @@ $textbotlang['users']['Report']['reportpayiranpay'] = "💵 پرداخت جدی�
 مبلغ تراکنش : %s
 روش پرداخت :  درگاه ارزی ریالی";
 $textbotlang['users']['Report']['discountuser'] = "کد هدیه %s استفاده شد
-            
-اطلاعات کاربر : 
-            
+
+اطلاعات کاربر :
+
 🪪 آیدی عددی : <code>%s</code>
 🪪  نام کاربری : @%s
 💰 مبلغ هدیه %s تومان";
+
+$textbotlang['users']['reserve']['btn'] = "📦 رزرو سرویس";
+$textbotlang['users']['reserve']['selectservice'] = "یک بسته برای رزرو انتخاب کنید:\n\n📌 سرویس رزرو شده پس از اتمام سرویس فعلی به‌صورت خودکار فعال خواهد شد.";
+$textbotlang['users']['reserve']['noreserve'] = "📭 هیچ سرویس رزرو شده‌ای ندارید.";
+$textbotlang['users']['reserve']['hasreserve'] = "✅ <b>سرویس رزرو شده</b>\n\n📦 بسته: <b>%s</b>\n💰 قیمت پرداخت‌شده: <b>%s تومان</b>\n📊 حجم: <b>%d گیگابایت</b>\n📅 مدت: <b>%d روز</b>\n\n⏳ پس از انقضای سرویس فعلی به‌صورت خودکار فعال می‌شود.";
+$textbotlang['users']['reserve']['invoice'] = "🧾 <b>پیش‌فاکتور رزرو سرویس</b>\n\n👤 نام کاربری سرویس: <code>%s</code>\n📦 بسته: <b>%s</b>\n💰 قیمت: <b>%s تومان</b>\n📅 مدت: <b>%s روز</b>\n📊 حجم: <b>%s گیگابایت</b>\n\n⚠️ با تایید رزرو، مبلغ از کیف‌پول شما کسر شده و سرویس رزرو شده پس از اتمام سرویس فعلی فعال می‌شود.";
+$textbotlang['users']['reserve']['invoice_campaign'] = "🧾 <b>پیش‌فاکتور رزرو سرویس</b>\n\n👤 نام کاربری سرویس: <code>%s</code>\n📦 بسته: <b>%s</b>\n💰 قیمت اصلی: <s>%s</s> تومان\n✅ قیمت با تخفیف %s%%: <b>%s تومان</b>\n📅 مدت: <b>%s روز</b>\n📊 حجم: <b>%s گیگابایت</b>\n\n⚠️ با تایید رزرو، مبلغ از کیف‌پول شما کسر شده و سرویس رزرو شده پس از اتمام سرویس فعلی فعال می‌شود.";
+$textbotlang['users']['reserve']['confirm_btn'] = "✅ تایید رزرو";
+$textbotlang['users']['reserve']['confirmed'] = "✅ <b>سرویس رزرو شد!</b>\n\n📦 بسته <b>%s</b> برای سرویس <code>%s</code> رزرو شد.\nپس از انقضای سرویس فعلی به‌صورت خودکار فعال خواهد شد.";
+$textbotlang['users']['reserve']['cancel_btn'] = "❌ لغو رزرو";
+$textbotlang['users']['reserve']['cancelled'] = "♻️ رزرو لغو شد و مبلغ <b>%s تومان</b> به کیف‌پول شما برگشت داده شد.";
+$textbotlang['users']['reserve']['activated'] = "🎉 <b>سرویس رزرو شده فعال شد!</b>\n\nبسته <b>%s</b> برای سرویس <code>%s</code> به‌صورت خودکار فعال شد.";
+$textbotlang['users']['reserve']['blocked_extend'] = "⚠️ شما یک سرویس رزرو دارید (<b>%s</b>).\nبرای تمدید دستی، ابتدا رزرو را از بخش «جزئیات سرویس» لغو کنید.";
+$textbotlang['users']['reserve']['back_to_service'] = "🔙 بازگشت به جزئیات سرویس";
 

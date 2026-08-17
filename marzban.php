@@ -280,7 +280,7 @@ function Modifyuser($location, $username, array $data)
 #-----------------------------------------------#
 function revoke_sub($username, $location)
 {
-    global $connect, $SECRET;
+    global $connect;
     $marzban_list_get = select(
         "marzban_panel",
         "*",
