@@ -209,8 +209,8 @@ function removeuserm($location,$username)
     ));
 
     $output = curl_exec($ch);
+    $data_useer = panelDeleteCurlResult($ch, $output);
     curl_close($ch);
-    $data_useer = json_decode($output, true);
     return $data_useer;
 }
 //----------------------------------

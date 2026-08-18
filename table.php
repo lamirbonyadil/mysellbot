@@ -359,7 +359,9 @@ try {
         Volume varchar(200) NULL,
         Service_time varchar(200) NULL,
         user_info TEXT NULL,
-        Status varchar(200) NULL)
+        Status varchar(200) NULL,
+        expired_at TIMESTAMP NULL DEFAULT NULL,
+        deleted_at TIMESTAMP NULL DEFAULT NULL)
         ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin");
         if (!$result) {
             echo "table invoice".mysqli_error($connect);
@@ -381,6 +383,10 @@ try {
         $Check_filde = $connect->query("SHOW COLUMNS FROM invoice LIKE 'expired_at'");
         if (mysqli_num_rows($Check_filde) != 1) {
            $result = $connect->query("ALTER TABLE invoice ADD expired_at TIMESTAMP NULL DEFAULT NULL");
+        }
+        $Check_filde = $connect->query("SHOW COLUMNS FROM invoice LIKE 'deleted_at'");
+        if (mysqli_num_rows($Check_filde) != 1) {
+           $result = $connect->query("ALTER TABLE invoice ADD deleted_at TIMESTAMP NULL DEFAULT NULL");
         }
     }
 } catch (Exception $e) {

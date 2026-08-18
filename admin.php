@@ -96,7 +96,7 @@ if ($text == $textbotlang['Admin']['keyboardadmin']['bot_statistics']) {
     $month_date_time_start = $current_date_time - 2592000;
     $datefirstday = time() - 86400;
     $dateacc = jdate('Y/m/d');
-    $sql = "SELECT * FROM invoice WHERE  (Status = 'active' OR Status = 'end_of_time'  OR Status = 'end_of_volume' OR status = 'sendedwarn') AND name_product != 'usertest' AND name_product != 'disabled'";
+    $sql = "SELECT * FROM invoice WHERE  (Status = 'active' OR Status = 'end_of_time'  OR Status = 'end_of_volume' OR status = 'sendedwarn') AND status != 'deleted' AND name_product != 'usertest'";
     $stmt = $pdo->prepare($sql);
     $stmt->execute();
     $dayListSell = $stmt->rowCount();
@@ -2064,7 +2064,7 @@ if ($text == $textbotlang['Admin']['keyboardadmin']['user_search']) {
         return;
     }
     $date = date("Y-m-d");
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM invoice WHERE (status = 'active' OR status = 'end_of_time'  OR status = 'end_of_volume' OR status = 'sendedwarn') AND name_product != 'usertest' AND name_product != 'disabled' AND id_user = :id_user");
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM invoice WHERE (status = 'active' OR status = 'end_of_time'  OR status = 'end_of_volume' OR status = 'sendedwarn') AND status != 'deleted' AND name_product != 'usertest' AND id_user = :id_user");
     $stmt->bindParam(':id_user', $text);
     $stmt->execute();
     $dayListSell = $stmt->rowCount();

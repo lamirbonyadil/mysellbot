@@ -193,7 +193,7 @@ if (strpos($text, "/start ") !== false) {
     $token = str_replace("/start ", "", $text);
     if ($token === "services") {
         // Redirect straight to My Services page
-        $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn') AND name_product != 'usertest' AND name_product != 'disabled' ORDER BY time_sell DESC LIMIT 10");
+        $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn') AND status != 'deleted' AND name_product != 'usertest' ORDER BY time_sell DESC LIMIT 10");
         $stmt->bindParam(':id_user', $from_id);
         $stmt->execute();
         $keyboardlists = ['inline_keyboard' => []];
@@ -440,7 +440,7 @@ if ($text == "/new") {
 }
 #-----------/status (my packages)------------#
 if ($text == "/status") {
-    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time'  OR status = 'end_of_volume' OR status = 'sendedwarn') AND name_product != 'usertest' AND name_product != 'disabled'");
+    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time'  OR status = 'end_of_volume' OR status = 'sendedwarn') AND status != 'deleted' AND name_product != 'usertest'");
     $stmt->bindParam(':id_user', $from_id);
     $stmt->execute();
     $invoices = $stmt->rowCount();
@@ -474,16 +474,16 @@ if ($text == "/status") {
             ],
         ];
     }
-    $total_items = select("invoice", "*", "id_user", $from_id, "count");
+    $total_items = countVisibleInvoices($pdo, $from_id);
     $total_pages = ceil($total_items / $items_per_page);
     if ($page > 1) {
         $keyboardlists['inline_keyboard'][] = [
-            ['text' => $textbotlang['users']['page']['previous'], 'callback_data' => 'prevpage_' . ($page - 1)]
+            ['text' => $textbotlang['users']['page']['previous'], 'callback_data' => 'previous_page']
         ];
     }
     if ($page < $total_pages) {
         $keyboardlists['inline_keyboard'][] = [
-            ['text' => $textbotlang['users']['page']['next'], 'callback_data' => 'nextpage_' . ($page + 1)]
+            ['text' => $textbotlang['users']['page']['next'], 'callback_data' => 'next_page']
         ];
     }
     $keyboardlists['inline_keyboard'][] = [
@@ -496,7 +496,7 @@ if ($text == "/status") {
 }
 #-----------/renew (renew service)------------#
 if ($text == "/renew") {
-    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time'  OR status = 'end_of_volume' OR status = 'sendedwarn') AND name_product != 'usertest' AND name_product != 'disabled'");
+    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time'  OR status = 'end_of_volume' OR status = 'sendedwarn') AND status != 'deleted' AND name_product != 'usertest'");
     $stmt->bindParam(':id_user', $from_id);
     $stmt->execute();
     $invoices = $stmt->rowCount();
@@ -553,7 +553,7 @@ if ($user['step'] == 'get_number') {
 }
 #-----------Purchased services------------#
 if ($text == $datatextbot['text_Purchased_services'] || $datain == "backorder" || $text == "/services") {
-    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time'  OR status = 'end_of_volume' OR status = 'sendedwarn') AND name_product != 'usertest' AND name_product != 'disabled'");
+    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time'  OR status = 'end_of_volume' OR status = 'sendedwarn') AND status != 'deleted' AND name_product != 'usertest'");
     $stmt->bindParam(':id_user', $from_id);
     $stmt->execute();
     $invoices = $stmt->rowCount();
@@ -607,7 +607,7 @@ if ($text == $datatextbot['text_Purchased_services'] || $datain == "backorder" |
     }
 }
 if ($datain == 'next_page') {
-    $numpage = select("invoice", "id_user", "id_user", $from_id, "count");
+    $numpage = countVisibleInvoices($pdo, $from_id);
     $page = $user['pagenumber'];
     $items_per_page = 10;
     $sum = $user['pagenumber'] * $items_per_page;
@@ -805,7 +805,7 @@ if ($user['step'] == "getusernameinfo") {
         return;
     }
 
-    $stmt_check_bound = $pdo->prepare("SELECT 1 FROM invoice WHERE username = :username AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn') AND name_product != 'usertest' AND name_product != 'disabled' LIMIT 1");
+    $stmt_check_bound = $pdo->prepare("SELECT 1 FROM invoice WHERE username = :username AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn') AND status != 'deleted' AND name_product != 'usertest' LIMIT 1");
     $stmt_check_bound->execute([':username' => $text]);
 
     if ($stmt_check_bound->fetchColumn()) {
@@ -1016,6 +1016,22 @@ if (preg_match('/delete_orphan_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
 if (preg_match('/product_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
     $username = $dataget[1];
     $nameloc = select("invoice", "*", "username", $username, "select");
+    if ($nameloc == false) {
+        sendmessage($from_id, $textbotlang['users']['status']['usernotfound'], $keyboard, 'html');
+        return;
+    }
+    $invoiceStatus = $nameloc['Status'] ?? $nameloc['status'] ?? '';
+    if (invoiceStatusIsRemoved($invoiceStatus)) {
+        $keyboard_deleted = json_encode([
+            'inline_keyboard' => [
+                [
+                    ['text' => $textbotlang['users']['status']['backlist'], 'callback_data' => 'backorder'],
+                ]
+            ]
+        ]);
+        Editmessagetext($from_id, $message_id, sprintf($textbotlang['users']['cron']['removeexpire'], $username), $keyboard_deleted);
+        return;
+    }
     $marzban_list_get = select("marzban_panel", "*", "name_panel", $nameloc['Service_location'], "select");
     // $DataUserOut = $ManagePanel->DataUser($nameloc['Service_location'], $username);
     // if (isset($DataUserOut['msg']) && $DataUserOut['msg'] == "User not found") {
@@ -1201,7 +1217,9 @@ if (preg_match('/product_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
         if (count($tempArray) > 0) {
             $keyboardsetting['inline_keyboard'][] = $tempArray;
         }
-        $keyboardsetting['inline_keyboard'][] = [['text' => $textbotlang['users']['reserve']['btn'], 'callback_data' => 'reserveservice_' . $username]];
+        if (invoiceStatusIsActive($nameloc['Status'] ?? $nameloc['status'] ?? '')) {
+            $keyboardsetting['inline_keyboard'][] = [['text' => $textbotlang['users']['reserve']['btn'], 'callback_data' => 'reserveservice_' . $username]];
+        }
         $keyboardsetting['inline_keyboard'][] = [['text' => $textbotlang['users']['status']['backlist'], 'callback_data' => 'backorder']];
         $keyboardsetting = json_encode($keyboardsetting);
 
@@ -1283,6 +1301,15 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
 } elseif (preg_match('/extend_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
     $username = $dataget[1];
     $nameloc = select("invoice", "*", "username", $username, "select");
+    if ($nameloc == false) {
+        sendmessage($from_id, $textbotlang['users']['extend']['error2'], null, 'HTML');
+        return;
+    }
+    $invoiceStatus = $nameloc['Status'] ?? $nameloc['status'] ?? '';
+    if (invoiceStatusIsRemoved($invoiceStatus)) {
+        sendmessage($from_id, sprintf($textbotlang['users']['cron']['removeexpire'], $username), null, 'HTML');
+        return;
+    }
     $marzban_list_get = select("marzban_panel", "*", "name_panel", $nameloc['Service_location'], "select");
     $DataUserOut = $ManagePanel->DataUser($nameloc['Service_location'], $username);
     if ($DataUserOut['status'] == "Unsuccessful") {
@@ -1462,6 +1489,11 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
         sendmessage($from_id, $textbotlang['users']['extend']['error2'], null, 'HTML');
         return;
     }
+    $confirmStatus = $nameloc['Status'] ?? $nameloc['status'] ?? '';
+    if (invoiceStatusIsRemoved($confirmStatus)) {
+        sendmessage($from_id, sprintf($textbotlang['users']['cron']['removeexpire'], $nameloc['username']), null, 'HTML');
+        return;
+    }
     $marzban_list_get = select("marzban_panel", "*", "name_panel", $nameloc['Service_location'], "select");
     if ($marzban_list_get == false) {
         sendmessage($from_id, $textbotlang['users']['extend']['error2'], null, 'HTML');
@@ -1501,7 +1533,17 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
     }
     $usernamepanel = $nameloc['username'];
     $Balance_Low_user = $user['Balance'] - $lockedPrice;
-    update("user", "Balance", $Balance_Low_user, "id", $from_id);
+    $pdo->beginTransaction();
+    try {
+        $lockStmt = $pdo->prepare("SELECT Status FROM invoice WHERE id_invoice = ? FOR UPDATE");
+        $lockStmt->execute([$nameloc['id_invoice']]);
+        $lockedStatus = $lockStmt->fetchColumn();
+        if (!invoiceStatusIsLive($lockedStatus)) {
+            $pdo->rollBack();
+            sendmessage($from_id, sprintf($textbotlang['users']['cron']['removeexpire'], $usernamepanel), null, 'HTML');
+            return;
+        }
+        update("user", "Balance", $Balance_Low_user, "id", $from_id);
     $ManagePanel->ResetUserDataUsage($nameloc['Service_location'], $user['Processing_value']);
     if ($marzban_list_get['type'] == "marzban") {
         if (intval($product['Service_time']) == 0) {
@@ -1646,11 +1688,21 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
         ]
     ]);
     $priceproductformat = number_format($lockedPrice);
+    if (!reactivateInvoiceIfNotDeleted($pdo, $nameloc['id_invoice'])) {
+        $pdo->rollBack();
+        sendmessage($from_id, sprintf($textbotlang['users']['cron']['removeexpire'], $usernamepanel), null, 'HTML');
+        return;
+    }
+    $pdo->commit();
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        error_log('confirmserivce: ' . $e->getMessage());
+        sendmessage($from_id, $textbotlang['users']['status']['error'], null, 'html');
+        return;
+    }
     $balanceformatsell = number_format(select("user", "Balance", "id", $from_id, "select")['Balance']);
-    update("invoice", "Status", "active", "id_invoice", $nameloc['id_invoice']);
-    update("invoice", "expired_at", NULL, "id_invoice", $nameloc['id_invoice']);
-    update("invoice", "Volume_Warning_Level", "0", "id_invoice", $nameloc['id_invoice']);
-    update("invoice", "Day_Warning_Level", "0", "id_invoice", $nameloc['id_invoice']);
     sendmessage($from_id, $textbotlang['users']['extend']['thanks'], $keyboardextendfnished, 'HTML');
     $text_report = sprintf($textbotlang['Admin']['Report']['extend'], $from_id, $username, $product['name_product'], $priceproductformat, $usernamepanel, $balanceformatsell, $nameloc['Service_location']);
     if (isset($setting['Channel_Report']) && strlen($setting['Channel_Report']) > 0) {
@@ -1661,6 +1713,14 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
     $nameloc  = select("invoice", "*", "username", $username, "select");
     if ($nameloc == false) {
         sendmessage($from_id, $textbotlang['users']['extend']['error2'], null, 'HTML');
+        return;
+    }
+    $reserveStatus = $nameloc['Status'] ?? $nameloc['status'] ?? '';
+    if (!invoiceStatusIsActive($reserveStatus)) {
+        $msg = invoiceStatusIsRemoved($reserveStatus)
+            ? sprintf($textbotlang['users']['cron']['removeexpire'], $username)
+            : $textbotlang['users']['extend']['error2'];
+        sendmessage($from_id, $msg, null, 'HTML');
         return;
     }
     $stmt = $pdo->prepare("SELECT * FROM reserved_package WHERE invoice_id = :iid AND status = 'pending' LIMIT 1");
@@ -1708,6 +1768,14 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
     $nameloc  = select("invoice", "*", "username", $username, "select");
     if ($nameloc == false) {
         sendmessage($from_id, $textbotlang['users']['extend']['error2'], null, 'HTML');
+        return;
+    }
+    $reserveStatus = $nameloc['Status'] ?? $nameloc['status'] ?? '';
+    if (!invoiceStatusIsActive($reserveStatus)) {
+        $msg = invoiceStatusIsRemoved($reserveStatus)
+            ? sprintf($textbotlang['users']['cron']['removeexpire'], $username)
+            : $textbotlang['users']['extend']['error2'];
+        sendmessage($from_id, $msg, null, 'HTML');
         return;
     }
     $stmt = $pdo->prepare("SELECT * FROM product WHERE (Location = :Location OR location = '/all') AND code_product = :code LIMIT 1");
@@ -1761,6 +1829,14 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
         sendmessage($from_id, $textbotlang['users']['extend']['error2'], null, 'HTML');
         return;
     }
+    $reserveStatus = $nameloc['Status'] ?? $nameloc['status'] ?? '';
+    if (!invoiceStatusIsActive($reserveStatus)) {
+        $msg = invoiceStatusIsRemoved($reserveStatus)
+            ? sprintf($textbotlang['users']['cron']['removeexpire'], $username)
+            : $textbotlang['users']['extend']['error2'];
+        sendmessage($from_id, $msg, null, 'HTML');
+        return;
+    }
     $existsStmt = $pdo->prepare("SELECT id FROM reserved_package WHERE invoice_id = :iid AND status = 'pending' LIMIT 1");
     $existsStmt->bindValue(':iid', $nameloc['id_invoice']);
     $existsStmt->execute();
@@ -1791,6 +1867,17 @@ if (preg_match('/subscriptionurl_([a-zA-Z0-9_.-]+)/', $datain, $dataget)) {
     }
     try {
         $pdo->beginTransaction();
+        $lockStmt = $pdo->prepare("SELECT Status FROM invoice WHERE id_invoice = ? FOR UPDATE");
+        $lockStmt->execute([$nameloc['id_invoice']]);
+        $lockedStatus = $lockStmt->fetchColumn();
+        if (!invoiceStatusIsActive($lockedStatus)) {
+            $pdo->rollBack();
+            $msg = invoiceStatusIsRemoved($lockedStatus)
+                ? sprintf($textbotlang['users']['cron']['removeexpire'], $username)
+                : $textbotlang['users']['extend']['error2'];
+            sendmessage($from_id, $msg, null, 'HTML');
+            return;
+        }
         // Re-check for a race: another tab may have confirmed while we were here
         $raceStmt = $pdo->prepare("SELECT id FROM reserved_package WHERE invoice_id = :iid AND status = 'pending' LIMIT 1");
         $raceStmt->bindValue(':iid', $nameloc['id_invoice']);

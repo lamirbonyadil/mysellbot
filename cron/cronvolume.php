@@ -142,7 +142,7 @@ $statusStmt = $pdo->prepare(
     "UPDATE invoice SET Status = 'sendedwarn' WHERE id_invoice = ? AND Status = 'active'"
 );
 $endOfVolumeStmt = $pdo->prepare(
-    "UPDATE invoice SET Status = 'end_of_volume', expired_at = COALESCE(expired_at, NOW()), Volume_Last_Checked_At = NOW() WHERE id_invoice = ? AND Status != 'end_of_volume'"
+    "UPDATE invoice SET Status = 'end_of_volume', expired_at = COALESCE(expired_at, NOW()), Volume_Last_Checked_At = NOW() WHERE id_invoice = ? AND Status IN ('active', 'sendedwarn')"
 );
 $touchStmt = $pdo->prepare(
     "UPDATE invoice SET Volume_Last_Checked_At = NOW() WHERE id_invoice = ?"

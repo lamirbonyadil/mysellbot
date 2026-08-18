@@ -638,9 +638,20 @@ class ManagePanel
         $Output = array();
         global $connect;
         $Get_Data_Panel = select("marzban_panel", "*", "name_panel", $name_panel, "select");
+        if ($Get_Data_Panel == false) {
+            return array(
+                'status' => 'Unsuccessful',
+                'msg' => 'Panel Not Found'
+            );
+        }
         if ($Get_Data_Panel['type'] == "marzban") {
             $UsernameData = removeuser($Get_Data_Panel['name_panel'], $username);
-            if (isset($UsernameData['detail']) && $UsernameData['detail']) {
+            if (!is_array($UsernameData)) {
+                $Output = array(
+                    'status' => 'Unsuccessful',
+                    'msg' => 'Empty or invalid panel response'
+                );
+            } elseif (isset($UsernameData['detail']) && $UsernameData['detail']) {
                 $Output = array(
                     'status' => 'Unsuccessful',
                     'msg' => $UsernameData['detail']
@@ -653,7 +664,12 @@ class ManagePanel
             }
         } elseif ($Get_Data_Panel['type'] == "marzneshin") {
             $UsernameData = removeuserm($Get_Data_Panel['name_panel'], $username);
-            if (isset($UsernameData['detail']) && $UsernameData['detail']) {
+            if (!is_array($UsernameData)) {
+                $Output = array(
+                    'status' => 'Unsuccessful',
+                    'msg' => 'Empty or invalid panel response'
+                );
+            } elseif (isset($UsernameData['detail']) && $UsernameData['detail']) {
                 $Output = array(
                     'status' => 'Unsuccessful',
                     'msg' => $UsernameData['detail']
@@ -666,10 +682,10 @@ class ManagePanel
             }
         } elseif ($Get_Data_Panel['type'] == "x-ui_single") {
             $UsernameData = removeClient($Get_Data_Panel['name_panel'], $username);
-            if (!$UsernameData['success']) {
+            if (!is_array($UsernameData) || empty($UsernameData['success'])) {
                 $Output = array(
                     'status' => 'Unsuccessful',
-                    'msg' => $UsernameData['msg']
+                    'msg' => is_array($UsernameData) ? ($UsernameData['msg'] ?? 'Panel removal failed') : 'Empty or invalid panel response'
                 );
             } else {
                 $Output = array(
@@ -679,10 +695,10 @@ class ManagePanel
             }
         } elseif ($Get_Data_Panel['type'] == "s_ui") {
             $UsernameData = removeClientS_ui($Get_Data_Panel['name_panel'], $username);
-            if (!$UsernameData['success']) {
+            if (!is_array($UsernameData) || empty($UsernameData['success'])) {
                 $Output = array(
                     'status' => 'Unsuccessful',
-                    'msg' => $UsernameData['msg']
+                    'msg' => is_array($UsernameData) ? ($UsernameData['msg'] ?? 'Panel removal failed') : 'Empty or invalid panel response'
                 );
             } else {
                 $Output = array(
@@ -692,10 +708,10 @@ class ManagePanel
             }
         } elseif ($Get_Data_Panel['type'] == "wgdashboard") {
             $UsernameData = remove_userwg($Get_Data_Panel['name_panel'], $username);
-            if (!$UsernameData['status']) {
+            if (!is_array($UsernameData) || empty($UsernameData['status'])) {
                 $Output = array(
                     'status' => 'Unsuccessful',
-                    'msg' => $UsernameData['msg']
+                    'msg' => is_array($UsernameData) ? ($UsernameData['msg'] ?? 'Panel removal failed') : 'Empty or invalid panel response'
                 );
             } else {
                 $Output = array(
@@ -704,13 +720,18 @@ class ManagePanel
                 );
             }
         } elseif ($Get_Data_Panel['type'] == "mikrotik") {
-            $UsernameData = GetUsermikrotik($Get_Data_Panel['name_panel'], $username)[0];
-            if (isset($UsernameData['error'])) {
+            $mikrotikUsers = GetUsermikrotik($Get_Data_Panel['name_panel'], $username);
+            $UsernameData = is_array($mikrotikUsers) ? ($mikrotikUsers[0] ?? null) : null;
+            if (!is_array($UsernameData)) {
                 $Output = array(
                     'status' => 'Unsuccessful',
-                    'msg' => $UsernameData['msg']
+                    'msg' => 'Empty or invalid panel response'
                 );
-
+            } elseif (isset($UsernameData['error'])) {
+                $Output = array(
+                    'status' => 'Unsuccessful',
+                    'msg' => $UsernameData['msg'] ?? 'Panel removal failed'
+                );
             } else {
                 deleteUser_mikrotik($Get_Data_Panel['name_panel'], $UsernameData['.id']);
                 $Output = array(

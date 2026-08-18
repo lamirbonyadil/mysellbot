@@ -128,6 +128,7 @@ $setting_panel = json_encode([
         [['text' => $textbotlang['Admin']['keyboardadmin']['settingscron']], ['text' => $textbotlang['Admin']['keyboardadmin']['test_account_settings']]],
         [['text' => $textbotlang['Admin']['channel']['channelreport']], ['text' => $textbotlang['Admin']['channel']['setting']]],
         [['text' => $textbotlang['Admin']['keyboardadmin']['affiliate_settings']]],
+        [['text' => $textbotlang['Admin']['cron']['remove']['timeset']]],
         [['text' => $textbotlang['Admin']['backup']['menubtn']]],
         [['text' => $textbotlang['Admin']['Back-Adminment']]]
     ],
@@ -625,7 +626,6 @@ $keyboardcronjob = json_encode([
         [['text' => $textbotlang['Admin']['cron']['reservation']['active']], ['text' => $textbotlang['Admin']['cron']['reservation']['disable']]],
         [['text' => $textbotlang['Admin']['cron']['inactivity']['active']], ['text' => $textbotlang['Admin']['cron']['inactivity']['disable']]],
         [['text' => $textbotlang['Admin']['cron']['remove']['active']], ['text' => $textbotlang['Admin']['cron']['remove']['disable']]],
-        [['text' => $textbotlang['Admin']['cron']['remove']['timeset']]],
         [['text' => $textbotlang['Admin']['Back-Adminment']]]
     ],
     'resize_keyboard' => true

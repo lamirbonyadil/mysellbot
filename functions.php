@@ -58,6 +58,62 @@ function update($table, $field, $newValue, $whereField = null, $whereValue = nul
         $stmt->execute([$newValue]);
     }
 }
+
+function invoiceStatusIsLive($status): bool
+{
+    return in_array((string)$status, ['active', 'end_of_time', 'end_of_volume', 'sendedwarn'], true);
+}
+
+function invoiceStatusIsActive($status): bool
+{
+    return (string)$status === 'active';
+}
+
+function invoiceStatusIsRemoved($status): bool
+{
+    return in_array((string)$status, ['deleted', 'pending_delete'], true);
+}
+
+function visibleInvoiceCondition(): string
+{
+    return "(Status = 'active' OR Status = 'end_of_time' OR Status = 'end_of_volume' OR Status = 'sendedwarn') AND name_product != 'usertest'";
+}
+
+function countVisibleInvoices($pdo, $id_user): int
+{
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM invoice WHERE id_user = :id_user AND " . visibleInvoiceCondition());
+    $stmt->bindValue(':id_user', $id_user);
+    $stmt->execute();
+    return (int) $stmt->fetchColumn();
+}
+
+function reactivateInvoiceIfNotDeleted($pdo, $id_invoice): bool
+{
+    $stmt = $pdo->prepare("UPDATE invoice SET Status = 'active', expired_at = NULL, deleted_at = NULL, Volume_Warning_Level = 0, Day_Warning_Level = 0 WHERE id_invoice = ? AND Status NOT IN ('deleted', 'pending_delete')");
+    $stmt->execute([$id_invoice]);
+    $check = $pdo->prepare("SELECT Status FROM invoice WHERE id_invoice = ?");
+    $check->execute([$id_invoice]);
+    return strtolower((string)$check->fetchColumn()) === 'active';
+}
+
+function panelDeleteCurlResult($ch, $output)
+{
+    $errno = curl_errno($ch);
+    $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    if ($output === false || $errno) {
+        return ['detail' => $error !== '' ? $error : 'Panel request failed'];
+    }
+    $data = json_decode($output, true);
+    if (is_array($data)) {
+        return $data;
+    }
+    if ($httpCode >= 200 && $httpCode < 300) {
+        return [];
+    }
+    return ['detail' => 'Empty or invalid panel response (HTTP ' . $httpCode . ')'];
+}
+
 function step($step, $from_id)
 {
     global $pdo;
@@ -601,11 +657,9 @@ function DirectPayment($order_id)
                 'parse_mode' => "HTML"
             ]);
         }
-        update("invoice", "status", "active", "username", $get_invoice['username']);
-        update("invoice", "expired_at", NULL, "username", $get_invoice['username']);
-        if ($Payment_report['Payment_Method'] == "cart to cart") {
-            update("invoice", "Status", "active", "id_invoice", $get_invoice['id_invoice']);
-        }
+        update("invoice", "status", "active", "id_invoice", $get_invoice['id_invoice']);
+        update("invoice", "expired_at", NULL, "id_invoice", $get_invoice['id_invoice']);
+        update("invoice", "deleted_at", NULL, "id_invoice", $get_invoice['id_invoice']);
     } else {
         // -------------------------------------------------------
         // WALLET TOP-UP: credit the balance first
@@ -650,6 +704,10 @@ function DirectPayment($order_id)
             if ($nameloc == false) {
                 return;
             }
+            $extendStatus = $nameloc['Status'] ?? $nameloc['status'] ?? '';
+            if (invoiceStatusIsRemoved($extendStatus)) {
+                return;
+            }
 
             // Load the panel
             $marzban_list_get = select("marzban_panel", "*", "name_panel", $nameloc['Service_location'], "select");
@@ -679,6 +737,16 @@ function DirectPayment($order_id)
                 // Still not enough — just leave the wallet topped up, don't renew
                 return;
             }
+
+            $pdo->beginTransaction();
+            try {
+                $lockStmt = $pdo->prepare("SELECT Status FROM invoice WHERE id_invoice = ? FOR UPDATE");
+                $lockStmt->execute([$nameloc['id_invoice']]);
+                $lockedStatus = $lockStmt->fetchColumn();
+                if (!invoiceStatusIsLive($lockedStatus)) {
+                    $pdo->rollBack();
+                    return;
+                }
 
             // Deduct the renewal price from the wallet
             $new_balance = $user_now['Balance'] - $lockedPrice;
@@ -787,10 +855,18 @@ function DirectPayment($order_id)
             }
 
             // Mark the invoice as active again
-            update("invoice", "Status", "active", "id_invoice", $nameloc['id_invoice']);
-            update("invoice", "expired_at", NULL, "id_invoice", $nameloc['id_invoice']);
-            update("invoice", "Volume_Warning_Level", "0", "id_invoice", $nameloc['id_invoice']);
-            update("invoice", "Day_Warning_Level", "0", "id_invoice", $nameloc['id_invoice']);
+            if (!reactivateInvoiceIfNotDeleted($pdo, $nameloc['id_invoice'])) {
+                $pdo->rollBack();
+                return;
+            }
+            $pdo->commit();
+            } catch (Exception $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                error_log('extendafterpay: ' . $e->getMessage());
+                return;
+            }
             // Notify the user that the renewal completed automatically
             $priceproductformat = number_format($lockedPrice);
             $balanceformatsell  = number_format(select("user", "Balance", "id", $Payment_report['id_user'], "select")['Balance']);
@@ -826,6 +902,10 @@ function DirectPayment($order_id)
             if ($nameloc == false) {
                 return;
             }
+            $reserveStatus = $nameloc['Status'] ?? $nameloc['status'] ?? '';
+            if (!invoiceStatusIsActive($reserveStatus)) {
+                return;
+            }
 
             $stmt = $pdo->prepare("SELECT * FROM product WHERE (Location = :Location OR location = '/all') AND code_product = :code_product LIMIT 1");
             $stmt->bindValue(':Location', $nameloc['Service_location']);
@@ -843,6 +923,14 @@ function DirectPayment($order_id)
 
             try {
                 $pdo->beginTransaction();
+
+                $lockStmt = $pdo->prepare("SELECT Status FROM invoice WHERE id_invoice = ? FOR UPDATE");
+                $lockStmt->execute([$nameloc['id_invoice']]);
+                $lockedStatus = $lockStmt->fetchColumn();
+                if (!invoiceStatusIsActive($lockedStatus)) {
+                    $pdo->rollBack();
+                    return;
+                }
 
                 // Re-check for duplicate and re-fetch balance inside the transaction
                 $existsStmt = $pdo->prepare("SELECT id FROM reserved_package WHERE invoice_id = :iid AND status = 'pending' LIMIT 1");
@@ -919,6 +1007,12 @@ function activateReservedPackage($pdo, $ManagePanel, $invoiceRow, $textbotlang)
         return false;
     }
 
+    $statusStmt = $pdo->prepare("SELECT Status FROM invoice WHERE id_invoice = ?");
+    $statusStmt->execute([$invoiceRow['id_invoice']]);
+    if (!invoiceStatusIsLive($statusStmt->fetchColumn())) {
+        return false;
+    }
+
     $ManagePanel->ResetUserDataUsage($invoiceRow['Service_location'], $invoiceRow['username']);
 
     $stime    = intval($reservation['Service_time']);
@@ -987,7 +1081,7 @@ function activateReservedPackage($pdo, $ManagePanel, $invoiceRow, $textbotlang)
 
     try {
         $pdo->beginTransaction();
-        $upd = $pdo->prepare("UPDATE invoice SET name_product = :name, Service_time = :stime, Volume = :vol, price_product = :price, Status = 'active', expired_at = NULL, Volume_Warning_Level = 0, Day_Warning_Level = 0 WHERE id_invoice = :iid");
+        $upd = $pdo->prepare("UPDATE invoice SET name_product = :name, Service_time = :stime, Volume = :vol, price_product = :price, Status = 'active', expired_at = NULL, deleted_at = NULL, Volume_Warning_Level = 0, Day_Warning_Level = 0 WHERE id_invoice = :iid AND Status NOT IN ('deleted', 'pending_delete')");
         $upd->execute([
             ':name'  => $reservation['name_product'],
             ':stime' => $reservation['Service_time'],
@@ -995,6 +1089,12 @@ function activateReservedPackage($pdo, $ManagePanel, $invoiceRow, $textbotlang)
             ':price' => $reservation['price_product'],
             ':iid'   => $invoiceRow['id_invoice'],
         ]);
+        $statusCheck = $pdo->prepare("SELECT Status FROM invoice WHERE id_invoice = ?");
+        $statusCheck->execute([$invoiceRow['id_invoice']]);
+        if (strtolower((string)$statusCheck->fetchColumn()) !== 'active') {
+            $pdo->rollBack();
+            return false;
+        }
         $markStmt = $pdo->prepare("UPDATE reserved_package SET status = 'activated', activated_at = NOW() WHERE id = :id");
         $markStmt->execute([':id' => $reservation['id']]);
         $pdo->commit();
